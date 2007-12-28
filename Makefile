@@ -1,6 +1,6 @@
 
 # microcontroller and project specific settings
-TARGET = tvbg
+TARGET = unzap
 F_CPU = 8000000UL
 MCU = atmega88
 
