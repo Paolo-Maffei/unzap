@@ -572,6 +572,23 @@ struct pulse_t PROGMEM codes[] = {
 ISR(TIMER1_COMPA_vect) {
     static uint16_t off = 0;
 
+    /* if button is released, stop sending */
+    if (PIND & _BV(PD2)) {
+        /* disable pwm and timer and reset mode */
+        PWM_OFF();
+        TIMER1_OFF();
+        mode = PWM_DISABLED;
+
+        /* turn off led */
+        PORTC |= _BV(PC5);
+
+        /* re-enable button interrupt */
+        EIFR = EIFR;
+        EIMSK = _BV(INT0);
+
+        return;
+    }
+
     if (mode == NEXT_CODE) {
         /* load pwm values, advance pointer and enable pwm */
         uint16_t freq, duty;
@@ -584,7 +601,7 @@ ISR(TIMER1_COMPA_vect) {
             mode = PWM_DISABLED;
             TIMER1_OFF();
 
-            /* re-enable button */
+            /* re-enable button interrupt */
             EIFR = EIFR;
             EIMSK = _BV(INT0);
         } else {
