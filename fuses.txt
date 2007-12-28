@@ -1,0 +1,20 @@
+atmega88/168:
+    low fuse byte:
+        clock-source external xtal: CHKSEL = 0111
+
+        disable system clock divide by 8: CKDIV8 = 1
+
+    -> default: 0b01100010 = 0x62
+       new:     0b11100111 = 0xe7
+
+
+    high fuse byte:
+        no eeprom erase on chip erase: EESAVE = 0
+
+    -> default: 0b11011111 = 0xdf
+       new:     0b11010111 = 0xd7
+
+
+    extended fuse byte:
+    -> default: 0x01
+
