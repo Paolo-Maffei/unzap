@@ -1990,7 +1990,7 @@ void start_sending(void) {
     next_off = 0;
 
     /* set initial delay */
-    OCR1A = 0xffff;
+    OCR1A = CODE_DELAY;
 
     /* enable timing interrupt */
     TIMSK1 = _BV(OCIE1A);
