@@ -19,6 +19,11 @@ AVRDUDE_FLAGS += -u -F
 .PHONY: all
 
 all: $(TARGET).hex $(TARGET).eep.hex $(TARGET).lss
+	@echo "==============================="
+	@echo "$(TARGET) compiled for: $(MCU)"
+	@echo -n "size is: "
+	@$(SIZE) -A $(TARGET).hex | grep "\.sec1" | tr -s " " | cut -d" " -f2
+	@echo "==============================="
 
 $(TARGET): $(OBJECTS) $(TARGET).o
 
