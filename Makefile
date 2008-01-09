@@ -1,7 +1,7 @@
 
 # microcontroller and project specific settings
 TARGET = unzap
-F_CPU = 8000000UL
+F_CPU = 20000000UL
 MCU = atmega88
 
 OBJECTS += $(patsubst %.c,%.o,$(shell echo *.c))
