@@ -87,7 +87,6 @@ volatile uint8_t retransmit;    /* current retransmit, reset by main function,
 /* sending functions */
 send_return_t send_space(void)
 {
-#if 0
     /* set on timing */
     OCR1B = params[0];
 
@@ -98,14 +97,7 @@ send_return_t send_space(void)
     else
         /* set off timing for zero */
         OCR1A = params[0]+params[2];
-#endif
 
-    OCR1B = 260;
-    OCR1A = 260+780;
-
-    return SEND_BIT;
-
-#if 0
     if (bit < params[4])
         return SEND_BIT;
     else {
@@ -116,7 +108,6 @@ send_return_t send_space(void)
             return SEND_RETRANSMIT;
         }
     }
-#endif
 }
 
 /* code table */
@@ -131,6 +122,8 @@ code_t PROGMEM codes[] = \
 /* the input capture interrupt is used for waiting in between the different codes */
 ISR(TIMER1_CAPT_vect)
 {
+
+    /* all of the following code is common for state WAIT_CODE and WAIT_RETRANSMIT */
 
     /* timer1 is already resetted (-> CTC mode), change the prescaler to 64,
      * for bit timing, in CTC mode (TOP == OCR1A) */
@@ -158,41 +151,43 @@ ISR(TIMER1_CAPT_vect)
  * next bit timing */
 ISR(TIMER1_COMPA_vect)
 {
-#if 0
-    /* increment bit counter for generating function */
+    /* set new bit counter for generating function */
     bit++;
 
     /* call generating function again */
     send_return_t ret = func();
 
     if (ret == SEND_BIT) {
-#endif
         /* turn on pwm, everything is set up, so that this interrupt is
          * called after the bit is transmitted */
         pwm_enable();
-        // PORTC &= ~_BV(PC5);
-#if 0
+        PORTC &= ~_BV(PC5);
     } else if (ret == SEND_RETRANSMIT) {
         /* wait between code and retransmit, input compare match has been
          * set up correctly by generating function, turn off output compare
          * match inturrupts and enable input compare match interrupt */
+
+        /* reconfigure timer1 for prescaler 64, in CTC mode (TOP = ICR1) */
+        TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM13) | _BV(WGM12);
+
         TIFR1 = _BV(ICF1);
         TIMSK1 = _BV(ICIE1);
         state = WAIT_RETRANSMIT;
+
+        /* increment retransmit counter */
+        retransmit++;
     } else if (ret == SEND_DONE) {
         /* disable all interrupts and set state */
         TIMSK1 = 0;
         state = IDLE;
     }
-#endif
-
 }
 
 /* this compare match interrupt is used to turn off pwm */
 ISR(TIMER1_COMPB_vect)
 {
     pwm_disable();
-    // PORTC |= _BV(PC5);
+    PORTC |= _BV(PC5);
 }
 
 int main(void) {
@@ -242,6 +237,8 @@ int main(void) {
 
             /* start timer1 with prescaler 256, in CTC mode (TOP = ICR1) */
             TCCR1B = _BV(CS12) | _BV(WGM13) | _BV(WGM12);
+
+            while(1);
         }
 #if 0
         code_t *code = &codes[0];
