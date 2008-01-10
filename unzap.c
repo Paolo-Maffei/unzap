@@ -57,8 +57,8 @@ volatile state_t state = IDLE;
 
 /* current code */
 code_t *code;
-send_function_t func;
-uint16_t params[PARAMS];
+volatile send_function_t func = NULL;
+volatile uint16_t params[PARAMS];
 volatile uint8_t bit;           /* current bit, reset by input capture interrupt of
                                    timer 1, incremented by compare match interrupt A of
                                    timer 1 */
@@ -140,11 +140,8 @@ ISR(TIMER1_CAPT_vect)
      * matter (because this should initiate the transmit of the first on/off sequence).
      *
      * this function must set up OCR1B and OCR1A according to the desired timing. */
-    //bit = 0;
-    //func();
-
-    OCR1B = 260;
-    OCR1A = 260+780;
+    bit = 0;
+    func();
 
     /* set new system mode */
     state = WAIT_BIT;
@@ -173,7 +170,7 @@ ISR(TIMER1_COMPA_vect)
         /* turn on pwm, everything is set up, so that this interrupt is
          * called after the bit is transmitted */
         pwm_enable();
-        PORTC &= ~_BV(PC5);
+        // PORTC &= ~_BV(PC5);
 #if 0
     } else if (ret == SEND_RETRANSMIT) {
         /* wait between code and retransmit, input compare match has been
@@ -195,7 +192,7 @@ ISR(TIMER1_COMPA_vect)
 ISR(TIMER1_COMPB_vect)
 {
     pwm_disable();
-    PORTC |= _BV(PC5);
+    // PORTC |= _BV(PC5);
 }
 
 int main(void) {
