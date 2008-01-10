@@ -22,9 +22,11 @@
 typedef enum {
     IDLE = 0,       /* the system is idle, nothing is happening,
                      * this might include power-down mode */
+    START,          /* start transmitting now */
     WAIT_BIT,       /* wait for on/off sequence to finish */
     WAIT_RETRANSMIT,/* wait until retransmit should occur */
     WAIT_CODE,      /* wait before transmitting the next code */
+    CODE_DONE,      /* code transmission has been completed (including retransmits) */
 } state_t;
 
 /* each code generating function returns these values */
@@ -59,12 +61,15 @@ volatile state_t state = IDLE;
 code_t *code;
 volatile send_function_t func = NULL;
 volatile uint16_t params[PARAMS];
-volatile uint8_t bit;           /* current bit, reset by input capture interrupt of
-                                   timer 1, incremented by compare match interrupt A of
-                                   timer 1 */
-volatile uint8_t retransmit;    /* current retransmit, reset by main function,
-                                   incremented by compare match A interrupt of
-                                   timer 1 */
+/* current bit, reset by input capture interrupt of timer 1, incremented by
+ * compare match interrupt A of timer 1 */
+volatile uint8_t bit;
+/* current retransmit counter, reset by main function, incremented by compare
+ * match A interrupt of timer 1 */
+volatile uint8_t retransmit;
+/* remaining retransmit timeout, is set to retransmit timeout by generating
+ * function, decremented by compare match A interrupt of timer 1 */
+volatile uint16_t retransmit_timeout;
 
 /*
  * pwm functions
@@ -98,13 +103,16 @@ send_return_t send_space(void)
         /* set off timing for zero */
         OCR1A = params[0]+params[2];
 
+    /* set retransmit timeout, if this is the first bit */
+    if (bit == 0)
+        retransmit_timeout = params[3] - OCR1A;
+
     if (bit < params[4])
         return SEND_BIT;
     else {
-        if (retransmit == 2)
+        if (retransmit == params[6])
             return SEND_DONE;
         else {
-            ICR1 = 31250;
             return SEND_RETRANSMIT;
         }
     }
@@ -115,24 +123,29 @@ code_t PROGMEM codes[] = \
 {
     /* code 0093 */
     /* freq    function     on  one  zero repeat bits    data data */
-    {    33, send_space, { 260, 780, 1840,    70,  15, 0xAAAA,   0 } },
-    // { send_space, { 260, 780, 1840,    70,  15, 0x41a2,   0 } },
+    {    33, send_space, { 260, 780, 1840, 31250,  15, 0xAAAA,   2 } },
 };
 
 /* the input capture interrupt is used for waiting in between the different codes */
 ISR(TIMER1_CAPT_vect)
 {
+    PORTC &= ~_BV(PC5);
 
     /* all of the following code is common for state WAIT_CODE and WAIT_RETRANSMIT */
+
+    /* turn on pwm */
+    pwm_enable();
 
     /* timer1 is already resetted (-> CTC mode), change the prescaler to 64,
      * for bit timing, in CTC mode (TOP == OCR1A) */
     TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM12);
 
-    /* reset bit counter, call generating function, return value does not
-     * matter (because this should initiate the transmit of the first on/off sequence).
+    /* reset bit counter, set remaining retransmit timeout, call generating
+     * function, return value does not matter (because this should initiate the
+     * transmit of the first on/off sequence).
      *
-     * this function must set up OCR1B and OCR1A according to the desired timing. */
+     * this function must set up OCR1B and OCR1A according to the desired timing,
+     * and retransmit_timeout according to the desired retransmit timeout */
     bit = 0;
     func();
 
@@ -142,9 +155,6 @@ ISR(TIMER1_CAPT_vect)
     /* clear old interrupts and enable compare interrupts */
     TIFR1 = _BV(OCF1A) | _BV(OCF1B) | _BV(ICF1);
     TIMSK1 = _BV(OCIE1A) | _BV(OCIE1B);
-
-    /* turn on pwm */
-    pwm_enable();
 }
 
 /* this compare match interrupt is used to call the generating function for
@@ -161,11 +171,16 @@ ISR(TIMER1_COMPA_vect)
         /* turn on pwm, everything is set up, so that this interrupt is
          * called after the bit is transmitted */
         pwm_enable();
-        PORTC &= ~_BV(PC5);
+        // PORTC &= ~_BV(PC5);
+
+        /* update retransmit timeout */
+        retransmit_timeout -= OCR1A;
+
     } else if (ret == SEND_RETRANSMIT) {
-        /* wait between code and retransmit, input compare match has been
-         * set up correctly by generating function, turn off output compare
-         * match inturrupts and enable input compare match interrupt */
+        /* wait between code and retransmit, set up input compare match,
+         * turn off output compare match inturrupts and enable input compare
+         * match interrupt */
+        ICR1 = retransmit_timeout;
 
         /* reconfigure timer1 for prescaler 64, in CTC mode (TOP = ICR1) */
         TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM13) | _BV(WGM12);
@@ -176,10 +191,13 @@ ISR(TIMER1_COMPA_vect)
 
         /* increment retransmit counter */
         retransmit++;
+
+        PORTC |= _BV(PC5);
     } else if (ret == SEND_DONE) {
         /* disable all interrupts and set state */
         TIMSK1 = 0;
-        state = IDLE;
+        state = CODE_DONE;
+        PORTC |= _BV(PC5);
     }
 }
 
@@ -187,7 +205,7 @@ ISR(TIMER1_COMPA_vect)
 ISR(TIMER1_COMPB_vect)
 {
     pwm_disable();
-    PORTC |= _BV(PC5);
+    // PORTC |= _BV(PC5);
 }
 
 int main(void) {
@@ -201,11 +219,6 @@ int main(void) {
     DDRC = _BV(PC5);
     PORTC = _BV(PC5);
 
-    /* enable timer1 input capture interrupt, which is used for delay between codes,
-     * and load delay (for prescaler 256) */
-    TIMSK1 = _BV(ICIE1);
-    ICR1 = DELAY_NEXT_CODE;
-
     sei();
 
 #if 0
@@ -216,14 +229,23 @@ int main(void) {
 
     // XXX FIXME
     pwm_set(33);
+    state = START;
+
+    /* remember the current code index and the amount of different codes
+     * in the code array */
+    uint8_t current_code;
+    uint8_t codesize = sizeof(codes)/sizeof(code_t);
 
     while(1) {
 
-        if (state == IDLE) {
+        if (state == START) {
             /* initialize global variales with first code */
+            current_code = 0;
             code = &codes[0];
-            state = WAIT_CODE;
+            state = CODE_DONE;
+        }
 
+        if (state == CODE_DONE && current_code < codesize) {
             /* load next function address from *code */
             func = (send_function_t)pgm_read_word(&code->func);
 
@@ -232,36 +254,19 @@ int main(void) {
             for (uint8_t i = 0; i < PARAMS; i++)
                 params[i] = pgm_read_word(ptr++);
 
-            /* reset retransmit counter */
+            /* reset retransmit counter, set state */
             retransmit = 0;
+            state = WAIT_CODE;
 
-            /* start timer1 with prescaler 256, in CTC mode (TOP = ICR1) */
+            /* set code delay, start timer1 with prescaler 256, in CTC mode (TOP = ICR1) */
+            ICR1 = DELAY_NEXT_CODE;
+            TIFR1 = _BV(ICF1);
+            TIMSK1 = _BV(ICIE1);
             TCCR1B = _BV(CS12) | _BV(WGM13) | _BV(WGM12);
 
-            while(1);
+            /* increment code pointer and index */
+            current_code++;
+            code = &codes[current_code];
         }
-#if 0
-        code_t *code = &codes[0];
-
-        while(1) {
-            send_function_t send_func;
-            send_func = (send_function_t)pgm_read_word(&code->func);
-
-            if (send_func == NULL)
-                break;
-
-            // pwm_set(pgm_read_byte(&codes[p].freq));
-            pwm_set(33);
-            uint16_t *ptr = code->params;
-            for (uint8_t i = 0; i < PARAMS; i++)
-                send_params[i] = pgm_read_word(ptr++);
-
-            send_func(0);
-
-            code++;
-        }
-
-        while(1);
-#endif
     }
 }
