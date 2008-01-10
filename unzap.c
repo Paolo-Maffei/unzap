@@ -116,23 +116,24 @@ int main(void) {
         PORTC |= _BV(PC5);
 
 
-        uint8_t p = 0;
+        code_t *code = &codes[0];
+
         while(1) {
             send_function_t send_func;
-            send_func = (send_function_t)pgm_read_word(&codes[p].func);
+            send_func = (send_function_t)pgm_read_word(&code->func);
 
             if (send_func == NULL)
                 break;
 
             // pwm_set(pgm_read_byte(&codes[p].freq));
             pwm_set(33);
-            uint16_t *ptr = codes[p].params;
+            uint16_t *ptr = code->params;
             for (uint8_t i = 0; i < PARAMS; i++)
                 send_params[i] = pgm_read_word(ptr++);
 
             send_func(0);
 
-            p++;
+            code++;
         }
 
         while(1);
