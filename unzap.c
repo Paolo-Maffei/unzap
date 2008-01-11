@@ -221,14 +221,7 @@ int main(void) {
 
     sei();
 
-#if 0
-    /* wait 2s, doing nothing */
-    for (uint8_t i = 0; i < 200; i++)
-        _delay_loop_2(50000);
-#endif
-
     // XXX FIXME
-    pwm_set(33);
     state = START;
 
     /* remember the current code index and the amount of different codes
@@ -253,6 +246,7 @@ int main(void) {
             uint16_t *ptr = code->params;
             for (uint8_t i = 0; i < PARAMS; i++)
                 params[i] = pgm_read_word(ptr++);
+            pwm_set(pgm_read_byte(&code->freq));
 
             /* reset retransmit counter, set state */
             retransmit = 0;
