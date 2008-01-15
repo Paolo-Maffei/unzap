@@ -74,8 +74,8 @@ volatile uint16_t retransmit_timeout;
 /*
  * pwm functions
  */
-/* setup timer0: fast pwm mode, clear OC0B on match, prescaler 8 */
 #define pwm_enable() { \
+    /* setup timer0: fast pwm mode, clear OC0B on match, prescaler 8 */ \
     TCCR0A = _BV(WGM00) | _BV(COM0B1); \
     TCCR0B = _BV(CS01) | _BV(WGM02);   \
 }
