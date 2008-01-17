@@ -10,6 +10,7 @@
  */
 // XXX FIXME
 #define PARAMS 7
+#define VARS 10
 
 /* wait 200ms at prescaler 256 (using timer1) */
 #define DELAY_NEXT_CODE (F_CPU/256/5)
@@ -49,20 +50,20 @@ typedef struct {
 /*
  * prototypes
  */
-void pwm_set(uint8_t freq);
-send_return_t send_space(void);
 
 /*
  * global variables
  */
 volatile state_t state = IDLE;
+volatile uint8_t tccr0b;
 
 /* current code */
 code_t *code;
 volatile send_function_t func = NULL;
 volatile uint16_t params[PARAMS];
+volatile uint8_t vars[VARS];
 /* current bit, reset by input capture interrupt of timer 1, incremented by
- * compare match interrupt A of timer 1 */
+ * generating function */
 volatile uint8_t bit;
 /* current retransmit counter, reset by main function, incremented by compare
  * match A interrupt of timer 1 */
@@ -77,7 +78,7 @@ volatile uint16_t retransmit_timeout;
 #define pwm_enable() { \
     /* setup timer0: fast pwm mode, clear OC0B on match, prescaler 8 */ \
     TCCR0A = _BV(WGM00) | _BV(COM0B1); \
-    TCCR0B = _BV(CS01) | _BV(WGM02);   \
+    TCCR0B = tccr0b;   \
 }
 #define pwm_disable() { \
     TCCR0A = 0;         \
@@ -85,13 +86,22 @@ volatile uint16_t retransmit_timeout;
     TCNT0 = 0;          \
 }
 #define pwm_set(freq) { \
+    if (freq > 127)  \
+        tccr0b = _BV(CS00) | _BV(WGM02);   \
+    else                                   \
+        tccr0b = _BV(CS01) | _BV(WGM02);   \
     OCR0A = freq;       \
     OCR0B = freq/4;     \
 }
 
 /* sending functions */
+send_return_t send_space(void);
+send_return_t send_nec(void);
+
+#if 0
 send_return_t send_space(void)
 {
+
     /* set on timing */
     OCR1B = params[0];
 
@@ -117,13 +127,83 @@ send_return_t send_space(void)
         }
     }
 }
+#endif
+
+send_return_t send_nec(void)
+{
+
+    /* vars[0] is zero, if no header has been sent before */
+    if (vars[0] == 0) {
+        /* send start header: 9ms pulse, 4.5ms pause */
+        OCR1B = 2250;
+        OCR1A = 3375;
+
+        /* mark header sent */
+        vars[0] = 1;
+
+        /* set retransmit timeout */
+        retransmit_timeout = params[3] - 3375;
+
+        return SEND_BIT;
+    } else if (retransmit > 0) {
+        /* this is a retransmit, just send "button still pressed" code */
+        if (bit == 0) {
+            /* send header: * 9ms pulse, 2.25ms pause */
+            OCR1B = 2250;
+            OCR1A = 2812;
+
+            /* set retransmit timeout */
+            retransmit_timeout = params[3] - 2812;
+
+        } else if (bit == 1) {
+            /* send a zero */
+            OCR1B = params[0];
+            OCR1A = params[2];
+        } else {
+            /* do 2 retransmits */
+            if (retransmit != 2)
+                return SEND_RETRANSMIT;
+            else
+                return SEND_DONE;
+        }
+
+
+        /* increment bit counter and send */
+        bit++;
+        return SEND_BIT;
+    }
+
+    /* set on timing: 560us */
+    OCR1B = params[0];
+
+    if (bit < params[4]) {
+        /* params[5] and params[7] contain the data to be sent, LSB first */
+        if (params[5 + bit/8] & _BV(bit % 8))
+            /* set pause for sending a one (on+off == 2.25ms) */
+            OCR1A = params[1];
+        else
+            /* set pause for sending a zero (on+off == 1.12ms) */
+            OCR1A = params[2];
+
+    } else if (bit == params[4]) {
+        /* send terminating zero */
+        OCR1A = params[2];
+    } else
+        return SEND_RETRANSMIT;
+
+    bit++;
+    return SEND_BIT;
+}
 
 /* code table */
 code_t PROGMEM codes[] = \
 {
     /* code 0093 */
     /* freq    function     on  one  zero repeat bits    data data */
-    {    33, send_space, { 260, 780, 1840, 31250,  15, 0xAAAA,   2 } },
+    //{    33, send_space, { 260, 780, 1840, 31250,  15, 0xAAAA,   2 } },
+
+    /* nec code: 00001010 11110101 11101000 00010111 */
+    { 210, send_nec, { 140, 562, 280, 27500, 16, 0xaf50, 0xe817 } },
 };
 
 /* the input capture interrupt is used for waiting in between the different codes */
@@ -140,9 +220,9 @@ ISR(TIMER1_CAPT_vect)
      * for bit timing, in CTC mode (TOP == OCR1A) */
     TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM12);
 
-    /* reset bit counter, set remaining retransmit timeout, call generating
-     * function, return value does not matter (because this should initiate the
-     * transmit of the first on/off sequence).
+    /* set remaining retransmit timeout, call generating function, return value
+     * does not matter (because this should initiate the transmit of the first
+     * on/off sequence).
      *
      * this function must set up OCR1B and OCR1A according to the desired timing,
      * and retransmit_timeout according to the desired retransmit timeout */
@@ -161,9 +241,6 @@ ISR(TIMER1_CAPT_vect)
  * next bit timing */
 ISR(TIMER1_COMPA_vect)
 {
-    /* set new bit counter for generating function */
-    bit++;
-
     /* call generating function again */
     send_return_t ret = func();
 
@@ -208,7 +285,8 @@ ISR(TIMER1_COMPB_vect)
     // PORTC |= _BV(PC5);
 }
 
-int main(void) {
+int main(void)
+{
     /* init output pin */
     DDRD = _BV(PD5);
 
@@ -247,6 +325,10 @@ int main(void) {
             for (uint8_t i = 0; i < PARAMS; i++)
                 params[i] = pgm_read_word(ptr++);
             pwm_set(pgm_read_byte(&code->freq));
+
+            /* reset send function variables */
+            for (uint8_t i = 0; i < VARS; i++)
+                vars[i] = 0;
 
             /* reset retransmit counter, set state */
             retransmit = 0;
