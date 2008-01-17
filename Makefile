@@ -8,8 +8,6 @@ OBJECTS += $(patsubst %.c,%.o,$(shell echo *.c))
 HEADERS += $(shell echo *.h)
 # CFLAGS += -Werror
 LDFLAGS += -L/usr/local/avr/avr/lib
-RS485_ADDRESS = 0x01
-CFLAGS += -DRS485_ADDRESS=$(RS485_ADDRESS)
 
 include avr.mk
 
