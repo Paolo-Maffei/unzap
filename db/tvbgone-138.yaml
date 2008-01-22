@@ -1,0 +1,5 @@
+type: raw
+frequency: 40580
+pattern:
+- [ 10670, 43290 ]
+- [ 10690,     0 ]

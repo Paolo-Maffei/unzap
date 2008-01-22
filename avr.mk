@@ -24,6 +24,9 @@ SIZE = avr-size
 ifeq ($(MCU),atmega8)
 	AVRDUDE_MCU=m8
 endif
+ifeq ($(MCU),atmega48)
+	AVRDUDE_MCU=m48
+endif
 ifeq ($(MCU),atmega88)
 	AVRDUDE_MCU=m88
 endif

@@ -1,18 +1,20 @@
 
 # microcontroller and project specific settings
 TARGET = unzap
-F_CPU = 20000000UL
-MCU = atmega88
+F_CPU = 16000000UL
+MCU = atmega48
+HARDWARE_REV=1
 
 OBJECTS += $(patsubst %.c,%.o,$(shell echo *.c))
 HEADERS += $(shell echo *.h)
 # CFLAGS += -Werror
 LDFLAGS += -L/usr/local/avr/avr/lib
-
-include avr.mk
+CFLAGS += -DHARDWARE_REV=$(HARDWARE_REV)
 
 # no safe mode checks
-AVRDUDE_FLAGS += -u -F
+AVRDUDE_FLAGS += -u
+
+include avr.mk
 
 .PHONY: all
 
