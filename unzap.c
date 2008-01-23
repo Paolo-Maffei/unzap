@@ -29,6 +29,8 @@
 
 #include "config.h"
 
+#define noinline __attribute__((noinline))
+
 /*
  * structures and variables
  */
@@ -51,6 +53,10 @@ struct params_t {
         struct {
             uint8_t repeat;     /* low byte is repeat count */
             uint8_t pwm;        /* high byte is pwm value */
+        };
+        struct {
+            uint8_t bits;
+            uint8_t flags;
         };
         uint16_t raw;
     };
@@ -75,9 +81,19 @@ volatile uint16_t *current_code;        /* pointer to the current location in th
  * prototypes
  */
 
+uint16_t noinline next_word(void);
+
 void send_raw(void);
 void send_nec(void);
+void send_pause(void);
 
+/* helper macros */
+#define HI8(x)  ((uint8_t)((x) >> 8))
+#define LO8(x)  ((uint8_t)(x))
+
+/* flags for send_pause */
+#define REPEAT_HEADER _BV(0)
+#define REPEAT_SUBTRACT_HEADER _BV(1)
 
 /* the code table */
 uint16_t PROGMEM codes[] = \
@@ -167,13 +183,21 @@ ISR(TIMER2_OVF_vect)
     }
 }
 
+/* helper functions */
+uint16_t noinline next_word(void)
+{
+
+    return pgm_read_word(current_code++);
+
+}
+
 /* sending functions */
 void send_raw(void)
 {
     /* load pwm timing, retransmit and retransmit timeout */
     struct params_t params;
-    params.raw = pgm_read_word(current_code++);
-    uint16_t retransmit_delay = pgm_read_word(current_code++);
+    params.raw = next_word();
+    uint16_t retransmit_delay = next_word();
 
     /* remember positing in timing table */
     uint16_t pos = 0;
@@ -206,13 +230,13 @@ void send_nec(void)
 {
     /* load pwm timing, retransmit and retransmit timeout */
     struct params_t params;
-    params.raw = pgm_read_word(current_code++);
-    uint16_t retransmit_delay = pgm_read_word(current_code++);
+    params.raw = next_word();
+    uint16_t retransmit_delay = next_word();
 
     /* load data */
     uint16_t data[2];
-    data[0] = pgm_read_word(current_code++);
-    data[1] = pgm_read_word(current_code++);
+    data[0] = next_word();
+    data[1] = next_word();
 
     /* add header */
     timing[0] = NEC_HEADER_ON;
@@ -263,6 +287,160 @@ void send_nec(void)
     pwm_set(params.pwm);
 }
 
+void send_pause(void)
+{
+    /* load pwm timing, retransmit and retransmit timeout */
+    struct params_t params;
+    params.raw = next_word();
+    uint16_t retransmit_delay = next_word();
+
+    /* load header */
+    uint16_t header_on = next_word();
+    uint16_t header_len = next_word();
+
+    /* load timing values */
+    uint16_t on = next_word();
+    uint16_t one = next_word();
+    uint16_t zero = next_word();
+
+    /* load data */
+    struct params_t params2;
+    params2.raw = next_word();
+
+#ifdef DEBUG_SEND_PAUSE
+    UDR0 = 'b';
+    while(!(UCSR0A & _BV(UDRE0)));
+    UDR0 = (uint8_t)params2.bits;
+    while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+    /* remember positing in timing table */
+    uint16_t pos = 0;
+
+    /* calculate retransmit timeout */
+    uint16_t retransmit;
+
+    for (uint8_t i = 0; i <= params.repeat; i++) {
+#ifdef DEBUG_SEND_PAUSE
+        UDR0 = 'S';
+        while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+        uint16_t *dataptr = (uint16_t *)current_code;
+
+        retransmit = retransmit_delay;
+
+        if (header_on != 0) {
+
+            if (i == 0 || (params2.flags & REPEAT_HEADER)) {
+#ifdef DEBUG_SEND_PAUSE
+                UDR0 = 'H';
+                while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                /* add header */
+                timing[pos] = header_on;
+                timing[pos+1] = header_len;
+                pos += 2;
+            }
+
+            if (i == 0 || (params2.flags & REPEAT_SUBTRACT_HEADER)) {
+#ifdef DEBUG_SEND_PAUSE
+                UDR0 = 'h';
+                while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                /* calculate retransmit timeout */
+                retransmit -= header_len;
+            }
+        }
+
+        uint16_t data = 0;
+
+        /* insert data into timing array */
+        for (uint8_t b = 0; b < params2.bits; b++) {
+
+            if (b % 16 == 0) {
+#ifdef DEBUG_SEND_PAUSE
+                UDR0 = 'D';
+                while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                /* load data */
+                data = pgm_read_word(dataptr++);
+
+#ifdef DEBUG_SEND_PAUSE
+                UDR0 = HI8(data);
+                while(!(UCSR0A & _BV(UDRE0)));
+                UDR0 = LO8(data);
+                while(!(UCSR0A & _BV(UDRE0)));
+#endif
+            }
+
+            /* on timing */
+            timing[pos++] = on;
+
+            if (data & 1) {
+#ifdef DEBUG_SEND_PAUSE
+                UDR0 = '1';
+                while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                /* one */
+                timing[pos] = one;
+            } else {
+#ifdef DEBUG_SEND_PAUSE
+                UDR0 = '0';
+                while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                /* zero */
+                timing[pos] = zero;
+            }
+
+            /* subtract cycle length from retransmit */
+            retransmit -= timing[pos];
+            pos++;
+
+            data >>= 1;
+        }
+
+        /* insert last on pulse and retransmit delay */
+        timing[pos++] = on;
+        timing[pos++] = retransmit+on;
+
+#ifdef DEBUG_SEND_PAUSE
+        UDR0 = 'R';
+        while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+        /* reset retransmit delay */
+        retransmit = retransmit_delay;
+    }
+
+    /* mark end of code */
+    timing[pos-1] = 0;
+
+    /* set loaded pwm value */
+    pwm_set(params.pwm);
+
+    //UDR0 = 's';
+    //while(!(UCSR0A & _BV(UDRE0)));
+
+#ifdef DEBUG_SEND_PAUSE_TIMING
+    for (uint16_t i = 0; i <= pos; i++) {
+        UDR0 = HI8(timing[i]);
+        while(!(UCSR0A & _BV(UDRE0)));
+        UDR0 = LO8(timing[i]);
+        while(!(UCSR0A & _BV(UDRE0)));
+    }
+#endif
+
+    //UDR0 = 'S';
+    //while(!(UCSR0A & _BV(UDRE0)));
+
+}
+
 /*
  * main function
  */
@@ -292,6 +470,12 @@ int main(void)
     TCCR2B = _BV(CS22) | _BV(CS20);
     TIMSK2 = _BV(TOIE2);
 
+    /* uart */
+    UBRR0H = 0;
+    UBRR0L = 8;
+    UCSR0C = _BV(UCSZ00) | _BV(UCSZ01);
+    UCSR0B = _BV(TXEN0);
+
     sei();
 
     while (1)
@@ -311,12 +495,14 @@ int main(void)
         if (state == LOAD_CODE) {
             /* load next generating function and generate timing table */
             void (*func)(void);
-            func = (void*)pgm_read_word(current_code++);
+            uint16_t ptr = next_word();
+            func = (void *)ptr;
 
             if (func != NULL && (PIND & _BV(PD4))) {
                 /* call generating function */
                 func();
 
+#if 0
                 /* reset timing pointer */
                 current_timing = &timing[0];
 
@@ -332,6 +518,7 @@ int main(void)
                 /* update state */
                 state = TRANSMIT_CODE;
             } else {
+#endif
                 PORTB |= _BV(PB1);
                 state = IDLE;
             }

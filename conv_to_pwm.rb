@@ -5,6 +5,10 @@ require 'yaml'
 $system_freq = 16000000
 $prescaler = 64
 
+def to_timing(us)
+    ($system_freq.to_f/$prescaler * us / 1000000).round
+end
+
 def convert_raw(code, pwm)
     if code.has_key? 'repeat' then
         repeat_delay = code['repeat_delay']
@@ -50,6 +54,66 @@ def convert_nec(code, pwm)
                           (code['data'][3] * 256 + code['data'][2]).to_s(16)]
 end
 
+def convert_pause(code, pwm)
+    repeat = to_timing(code['repeat_delay'])
+    puts "     (%d << 8) | %d, %d," % [pwm, code['repeat'], repeat]
+    puts "    /* parameters */"
+
+    if code.has_key? 'header' then
+        puts "    /* header on timing, header length */"
+        header_on = to_timing(code['header'][0])
+        header_length = to_timing(code['header'][0]+code['header'][1])
+        puts "     0x%s, 0x%s," % [header_on.to_s(16), header_length.to_s(16)]
+    else
+        puts "    /* no header */"
+        puts "     0, 0,"
+    end
+
+    puts "    /* on length, length one (on+pause), length zero (on+pause) */"
+    on = to_timing(code['on_length'])
+    one = to_timing(code['on_length']+code['pause_one'])
+    zero = to_timing(code['on_length']+code['pause_zero'])
+
+    puts "     0x%s, 0x%s, 0x%s," % [on.to_s(16), one.to_s(16), zero.to_s(16)]
+
+    puts "    /* flags, bitcount */ "
+
+    bits = code['bits']
+    bits |= (1<<8) if code['flags'].member? 'repeat_header'
+    bits |= (1<<9) if code['flags'].member? 'repeat_subtract_header'
+
+    puts "     0x%s," % bits.to_s(16)
+
+    puts "    /* data: */"
+
+    bits = code['bits']
+
+    if bits == 16 || bits == 12 then
+        puts "     0x%s," % [ (code['data'][1] * 256 + code['data'][0]).to_s(16) ]
+    elsif bits == 32 then
+        print "     "
+        0.upto(1) do |i|
+            print "0x%s, " % (code['data'][2*i+1] * 256 + code['data'][2*i]).to_s(16)
+        end
+        puts
+    elsif bits == 42 then
+        print "     "
+        0.upto(2) do |i|
+            print "0x%s, " % (code['data'][2*i+1] * 256 + code['data'][2*i]).to_s(16)
+        end
+        puts
+    elsif bits == 48 then
+        print "     "
+        0.upto(2) do |i|
+            print "0x%s, " % (code['data'][2*i+1] * 256 + code['data'][2*i]).to_s(16)
+        end
+        puts
+    else
+        $stderr.puts "unsupported number of bits: %d" % bits
+        exit 1
+    end
+end
+
 code = YAML.load(open(ARGV[0]).read())
 
 # calculate pwm freq with prescalers 1 and 8
@@ -66,6 +130,8 @@ if code['type'] == 'raw' then
     puts "    (uint16_t)send_raw,"
 elsif code['type'] == 'nec' then
     puts "    (uint16_t)send_nec,"
+elsif code['type'] == 'pause' then
+    puts "    (uint16_t)send_pause,"
 else
     $stderr.puts "unknown code type: %s" % code['type']
     exit 2
@@ -86,8 +152,12 @@ else
     pwm = pwm1
 end
 
+puts "    /* pwm, repeat, repeat_delay */"
+
 if code['type'] == 'raw' then
     convert_raw(code, pwm)
 elsif code['type'] == 'nec' then
     convert_nec(code, pwm)
+elsif code['type'] == 'pause' then
+    convert_pause(code, pwm)
 end
