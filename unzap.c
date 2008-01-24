@@ -25,6 +25,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
+#include <avr/sleep.h>
 #include <util/delay.h>
 
 #include "config.h"
@@ -43,8 +44,9 @@ typedef enum {
                      * its generating function */
     TRANSMIT_CODE,  /* the system is transmitting the code currently loaded
                      * in the timing[] array */
-    LAST_ON_PULSE   /* the system is just transmitting the last on pulse, afterwards
+    LAST_ON_PULSE,  /* the system is just transmitting the last on pulse, afterwards
                      * the current code transmission is complete */
+    SLEEP,          /* processor should sleep */
 } state_t;
 
 /* structure for efficiently addressing pwm and repeat parameters in code table */
@@ -76,6 +78,8 @@ volatile uint16_t timing[376];  /* hold on/off values for the current timing */
 volatile uint16_t *current_timing;      /* pointer to the current location in the timing table */
 
 volatile uint16_t *current_code;        /* pointer to the current location in the code table */
+
+volatile uint8_t sleep_counter;
 
 /*
  * prototypes
@@ -182,7 +186,17 @@ ISR(TIMER2_OVF_vect)
             }
         }
     }
+
+    if (state == IDLE) {
+        sleep_counter++;
+
+        if (sleep_counter == 0)
+            state = SLEEP;
+    }
 }
+
+/* pin change interrupt 2 does nothing, enabled just for wakeup */
+ISR(PCINT2_vect) {}
 
 /* helper functions */
 uint16_t noinline next_word(void)
@@ -401,6 +415,10 @@ int main(void)
     DDRD = _BV(PD5);
     PORTD = _BV(PD2) | _BV(PD4) | _BV(PD6);
 
+    /* configure pin change interrupt for button 1 and 2,
+     * for waking up from sleep mode... */
+    PCMSK2 = _BV(PCINT18) | _BV(PCINT20);
+
     /* hardware on port B:
      * PB0: BTN4
      * PB1: /LED2
@@ -492,6 +510,32 @@ int main(void)
                 PORTB |= _BV(PB1);
                 state = IDLE;
             }
+
+            sleep_counter = 0;
+        }
+
+        if (state == SLEEP) {
+#ifdef DEBUG_UART
+            UDR0 = 'S';
+            while(!(UCSR0A & _BV(UDRE0)));
+            while(!(UCSR0A & _BV(TXC0)));
+#endif
+            /* enable pin change interrupt for button 1 and 2,
+             * for waking up from sleep mode... */
+            PCICR = _BV(PCIE2);
+
+            /* set and enter sleep mode */
+            set_sleep_mode(SLEEP_MODE_STANDBY);
+            sleep_enable();
+            sleep_cpu();
+            sleep_disable();
+            sleep_counter = 0;
+            state = IDLE;
+
+            /* disable pin change interrupt for button 1 and 2,
+             * for waking up from sleep mode... */
+            PCICR = 0;
+
         }
     }
 }
