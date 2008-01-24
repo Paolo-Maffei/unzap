@@ -517,11 +517,6 @@ int main(void)
         }
 
         if (state == SLEEP) {
-#ifdef DEBUG_UART
-            UDR0 = 'S';
-            while(!(UCSR0A & _BV(UDRE0)));
-            while(!(UCSR0A & _BV(TXC0)));
-#endif
             /* enable pin change interrupt for button 1 and 2,
              * for waking up from sleep mode... */
             PCICR = _BV(PCIE2);
