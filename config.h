@@ -48,8 +48,8 @@
  * timing constants
  */
 
-/* wait 200ms at prescaler 64, MUST be <= 0xfffd! */
-#define DELAY_NEXT_CODE (F_CPU/64/5)
+/* wait 250ms at prescaler 256, MUST be <= 0xfffd! */
+#define DELAY_NEXT_CODE (F_CPU/256/4)
 
 /* special protocols */
 #define NEC_HEADER_ON  (F_CPU/64 * 9000 / 1000000)

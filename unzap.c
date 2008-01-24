@@ -133,6 +133,8 @@ uint16_t PROGMEM codes[] = \
 /* this compare match interrupt is used to turn on pwm at the beginnig of a on/off cycle */
 ISR(TIMER1_COMPA_vect)
 {
+    /* switch prescaler to 64 */
+    TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM12);
 
     pwm_enable();
     PORTB &= ~_BV(PB2);
@@ -494,13 +496,13 @@ int main(void)
                 state = TRANSMIT_CODE;
 
                 /* init timer1 for initial delay before sending:
-                 * prescaler 64, CTC mode (TOP == OCR1A)
+                 * prescaler 256, CTC mode (TOP == OCR1A)
                  * enable compare interrupts */
                 OCR1A = DELAY_NEXT_CODE;
                 OCR1B = 0xffff;
                 TIFR1 = _BV(OCF1A) | _BV(OCF1B);
                 TIMSK1 = _BV(OCIE1A) | _BV(OCIE1B);
-                TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM12);
+                TCCR1B = _BV(CS12) | _BV(WGM12);
             } else {
 #ifdef DEBUG_UART
                 UDR0 = 'E';
