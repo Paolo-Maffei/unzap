@@ -11,8 +11,10 @@ atmega88/168:
     high fuse byte:
         no eeprom erase on chip erase: EESAVE = 0
 
+        brown out detection level 2.7V: BODLEVEL = 101
+
     -> default: 0b11011111 = 0xdf
-       new:     0b11010111 = 0xd7
+       new:     0b11010101 = 0xd5
 
 
     extended fuse byte:
