@@ -129,6 +129,7 @@ uint16_t PROGMEM codes[] = \
 /* this compare match interrupt is used to turn on pwm at the beginnig of a on/off cycle */
 ISR(TIMER1_COMPA_vect)
 {
+
     pwm_enable();
     PORTB &= ~_BV(PB2);
 
@@ -307,37 +308,23 @@ void send_pause(void)
     struct params_t params2;
     params2.raw = next_word();
 
-#ifdef DEBUG_SEND_PAUSE
-    UDR0 = 'b';
-    while(!(UCSR0A & _BV(UDRE0)));
-    UDR0 = (uint8_t)params2.bits;
-    while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
     /* remember positing in timing table */
     uint16_t pos = 0;
 
     /* calculate retransmit timeout */
     uint16_t retransmit;
 
-    for (uint8_t i = 0; i <= params.repeat; i++) {
-#ifdef DEBUG_SEND_PAUSE
-        UDR0 = 'S';
-        while(!(UCSR0A & _BV(UDRE0)));
-#endif
+    uint16_t *dataptr;
 
-        uint16_t *dataptr = (uint16_t *)current_code;
+    for (uint8_t i = 0; i <= params.repeat; i++) {
+
+        dataptr = (uint16_t *)current_code;
 
         retransmit = retransmit_delay;
 
         if (header_on != 0) {
 
             if (i == 0 || (params2.flags & REPEAT_HEADER)) {
-#ifdef DEBUG_SEND_PAUSE
-                UDR0 = 'H';
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
                 /* add header */
                 timing[pos] = header_on;
                 timing[pos+1] = header_len;
@@ -345,11 +332,6 @@ void send_pause(void)
             }
 
             if (i == 0 || (params2.flags & REPEAT_SUBTRACT_HEADER)) {
-#ifdef DEBUG_SEND_PAUSE
-                UDR0 = 'h';
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
                 /* calculate retransmit timeout */
                 retransmit -= header_len;
             }
@@ -359,48 +341,27 @@ void send_pause(void)
 
         /* insert data into timing array */
         for (uint8_t b = 0; b < params2.bits; b++) {
-
             if (b % 16 == 0) {
-#ifdef DEBUG_SEND_PAUSE
-                UDR0 = 'D';
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
                 /* load data */
                 data = pgm_read_word(dataptr++);
-
-#ifdef DEBUG_SEND_PAUSE
-                UDR0 = HI8(data);
-                while(!(UCSR0A & _BV(UDRE0)));
-                UDR0 = LO8(data);
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
             }
 
             /* on timing */
             timing[pos++] = on;
 
             if (data & 1) {
-#ifdef DEBUG_SEND_PAUSE
-                UDR0 = '1';
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
                 /* one */
-                timing[pos] = one;
+                timing[pos++] = one;
+
+                /* subtract cycle length from retransmit */
+                retransmit -= one;
             } else {
-#ifdef DEBUG_SEND_PAUSE
-                UDR0 = '0';
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
                 /* zero */
-                timing[pos] = zero;
-            }
+                timing[pos++] = zero;
 
-            /* subtract cycle length from retransmit */
-            retransmit -= timing[pos];
-            pos++;
+                /* subtract cycle length from retransmit */
+                retransmit -= zero;
+            }
 
             data >>= 1;
         }
@@ -409,36 +370,18 @@ void send_pause(void)
         timing[pos++] = on;
         timing[pos++] = retransmit+on;
 
-#ifdef DEBUG_SEND_PAUSE
-        UDR0 = 'R';
-        while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
         /* reset retransmit delay */
         retransmit = retransmit_delay;
     }
+
+    /* remember positing in code table */
+    current_code = dataptr;
 
     /* mark end of code */
     timing[pos-1] = 0;
 
     /* set loaded pwm value */
     pwm_set(params.pwm);
-
-    //UDR0 = 's';
-    //while(!(UCSR0A & _BV(UDRE0)));
-
-#ifdef DEBUG_SEND_PAUSE_TIMING
-    for (uint16_t i = 0; i <= pos; i++) {
-        UDR0 = HI8(timing[i]);
-        while(!(UCSR0A & _BV(UDRE0)));
-        UDR0 = LO8(timing[i]);
-        while(!(UCSR0A & _BV(UDRE0)));
-    }
-#endif
-
-    //UDR0 = 'S';
-    //while(!(UCSR0A & _BV(UDRE0)));
-
 }
 
 /*
@@ -470,13 +413,20 @@ int main(void)
     TCCR2B = _BV(CS22) | _BV(CS20);
     TIMSK2 = _BV(TOIE2);
 
+#ifdef DEBUG_UART
     /* uart */
     UBRR0H = 0;
     UBRR0L = 8;
     UCSR0C = _BV(UCSZ00) | _BV(UCSZ01);
     UCSR0B = _BV(TXEN0);
 
+    UDR0 = 'b';
+    while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
     sei();
+
+    uint8_t pos = 0;
 
     while (1)
     {
@@ -486,6 +436,8 @@ int main(void)
 
             /* if we're idle, reset pointer and start transmitting */
             if (state == IDLE) {
+                pos = 0;
+
                 current_code = &codes[0];
                 state = LOAD_CODE;
                 PORTB &= ~_BV(PB1);
@@ -493,18 +445,35 @@ int main(void)
         }
 
         if (state == LOAD_CODE) {
+#ifdef DEBUG_UART
+            UDR0 = 'L';
+            while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
             /* load next generating function and generate timing table */
             void (*func)(void);
             uint16_t ptr = next_word();
             func = (void *)ptr;
 
             if (func != NULL && (PIND & _BV(PD4))) {
+#ifdef DEBUG_UART
+                UDR0 = 'p';
+                while(!(UCSR0A & _BV(UDRE0)));
+                UDR0 = pos++;
+                while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
                 /* call generating function */
                 func();
 
-#if 0
+                UDR0 = 'f';
+                while(!(UCSR0A & _BV(UDRE0)));
+
                 /* reset timing pointer */
                 current_timing = &timing[0];
+
+                /* update state */
+                state = TRANSMIT_CODE;
 
                 /* init timer1 for initial delay before sending:
                  * prescaler 64, CTC mode (TOP == OCR1A)
@@ -514,11 +483,12 @@ int main(void)
                 TIFR1 = _BV(OCF1A) | _BV(OCF1B);
                 TIMSK1 = _BV(OCIE1A) | _BV(OCIE1B);
                 TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM12);
-
-                /* update state */
-                state = TRANSMIT_CODE;
             } else {
+#ifdef DEBUG_UART
+                UDR0 = 'E';
+                while(!(UCSR0A & _BV(UDRE0)));
 #endif
+
                 PORTB |= _BV(PB1);
                 state = IDLE;
             }
