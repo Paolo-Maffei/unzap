@@ -2,8 +2,8 @@ type: raw
 frequency: 34800
 repeat: 1
 repeat_delay: 120000
-comment: 'same like tvbgone-005.yaml'
-related: 'tvbgone-005'
+comment: 'same like tvbgone-109.yaml'
+related: 'tvbgone-109'
 pattern:
 - [   920,   920 ]
 - [  1840,   920 ]

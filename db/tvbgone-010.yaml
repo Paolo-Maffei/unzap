@@ -9,8 +9,8 @@ pause_zero: 530
 bits: 16
 flags: [repeat_subtract_header]
 data: [ 0x03, 0x17 ]
-comment: 'same like tvbgone-010'
-related: 'tvbgone-010'
+comment: 'same like tvbgone-107'
+related: 'tvbgone-107'
 pattern:
 - [  8620,  4310 ] # header
 - [   530,  1610 ] # 1

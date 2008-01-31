@@ -9,6 +9,8 @@ pause_zero: 440
 bits: 48
 flags: [repeat_header, repeat_subtract_header]
 data: [ 0x02, 0x20, 0x80, 0x00, 0x3d, 0xbd ]
+comment: 'same like tvbgone-002'
+related: 'tvbgone-002'
 pattern:
 - [  3580,  1790 ] # header
 - [   470,   440 ] # 0

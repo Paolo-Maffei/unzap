@@ -3,6 +3,8 @@ frequency: 38000
 data: [ 0x50, 0xaf, 0x17, 0xe8 ]
 repeat_delay: 110000
 repeat: 2
+comment: 'same like tvbgone-011'
+related: 'tvbgone-011'
 pattern:
 - [  9240,  4640 ] # header
 - [   580,   570 ] # 0

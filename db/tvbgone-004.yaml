@@ -3,8 +3,8 @@ frequency: 38000
 repeat_delay: 110000
 repeat: 2
 data: [ 0x40, 0xbf, 0x12, 0xed ]
-comment: 'same like tvbgone-004'
-related: 'tvbgone-004'
+comment: 'same like tvbgone-110'
+related: 'tvbgone-110'
 pattern:
 - [  9240,  4640 ] # header
 - [   580,   570 ] # 0
