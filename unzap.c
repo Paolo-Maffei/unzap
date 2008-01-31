@@ -486,8 +486,10 @@ int main(void)
                 /* call generating function */
                 func();
 
+#ifdef DEBUG_UART
                 UDR0 = 'f';
                 while(!(UCSR0A & _BV(UDRE0)));
+#endif
 
                 /* reset timing pointer */
                 current_timing = &timing[0];
