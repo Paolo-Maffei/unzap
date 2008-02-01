@@ -86,6 +86,7 @@ volatile uint8_t sleep_counter;
 
 uint8_t silent;                         /* set to one, if the transmit should
                                          * be done without flashing leds */
+uint8_t single_step;                    /* wait for keypress between codes */
 
 /*
  * prototypes
@@ -569,6 +570,15 @@ int main(void)
                 else
                     blink(BLINK_NONSILENT);
 
+            } else if (button_press[0] == 0 && button_press[1] == 2) {
+                single_step = !single_step;
+
+                /* blink for single step toggle */
+                if (single_step)
+                    blink(BLINK_STEP);
+                else
+                    blink(BLINK_NOSTEP);
+
             } else {
                 blink(BLINK_INVALID);
             }
@@ -583,9 +593,27 @@ int main(void)
         }
 
         if (state == LOAD_CODE) {
-            /* stop sending if button1 has been pressed again */
-            if (button_press[0] > 0) {
+
+            /* if we're in single-step mode, wait for a keypress */
+            if (single_step) {
+                while (button_press[0] == 0 && button_press[1] == 0);
+
+                /* send next code if button1 has been pressed, stop if button2
+                 * has been pressed */
+                if (button_press[1]) {
+                    button_press[1] = 1;
+                } else {
+                    button_press[1] = 0;
+                }
+
+                /* reset buttons */
                 button_press[0] = 0;
+            }
+
+            /* stop sending if button2 has been pressed */
+            if (button_press[1] > 0) {
+                button_press[0] = 0;
+                button_press[1] = 0;
                 PORTB |= _BV(PB1);
 
 #ifdef BLINK_MODE1_END
