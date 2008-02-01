@@ -84,9 +84,11 @@ volatile uint16_t *current_code;        /* pointer to the current location in th
 
 volatile uint8_t sleep_counter;
 
-uint8_t silent;                         /* set to one, if the transmit should
-                                         * be done without flashing leds */
-uint8_t single_step;                    /* wait for keypress between codes */
+struct {
+    uint8_t silent:1;       /* set to one, if the transmit should
+                             * be done without flashing leds */
+    uint8_t single_step:1;  /* wait for keypress between codes */
+} options;
 
 /*
  * prototypes
@@ -146,7 +148,7 @@ ISR(TIMER1_COMPA_vect)
     TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM12);
 
     pwm_enable();
-    if (!silent)
+    if (!options.silent)
         PORTB &= ~_BV(PB2);
 
     /* load on pulse duration */
@@ -521,10 +523,7 @@ int main(void)
 
             /* wait one second via timer1, using prescaler 1024 */
             TIFR1 = _BV(OCF1A);
-            TCNT1 = 0;
             OCR1A = F_CPU/1024/2;
-            TIMSK1 = 0;
-            TCCR1A = 0;
             TCCR1B = _BV(CS12) | _BV(CS10);
 
             button_sum = 0;
@@ -559,22 +558,22 @@ int main(void)
                 blink(BLINK_MODE1);
 #endif
 
-                if (!silent)
+                if (!options.silent)
                     PORTB &= ~_BV(PB1);
             } else if (button_press[0] == 0 && button_press[1] == 1) {
-                silent = !silent;
+                options.silent = !options.silent;
 
                 /* blink for silent toggle */
-                if (silent)
+                if (options.silent)
                     blink(BLINK_SILENT);
                 else
                     blink(BLINK_NONSILENT);
 
             } else if (button_press[0] == 0 && button_press[1] == 2) {
-                single_step = !single_step;
+                // single_step = !single_step;
 
                 /* blink for single step toggle */
-                if (single_step)
+                if (options.single_step)
                     blink(BLINK_STEP);
                 else
                     blink(BLINK_NOSTEP);
@@ -595,7 +594,7 @@ int main(void)
         if (state == LOAD_CODE) {
 
             /* if we're in single-step mode, wait for a keypress */
-            if (single_step) {
+            if (options.single_step) {
                 while (button_press[0] == 0 && button_press[1] == 0);
 
                 /* send next code if button1 has been pressed, stop if button2
