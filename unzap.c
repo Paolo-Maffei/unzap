@@ -70,9 +70,11 @@ struct params_t {
 volatile state_t state = IDLE;
 volatile uint8_t tccr0b;    /* holds the value for TCCR0B register, set by pwm_set() */
 
-#define BUTTONS 1
-volatile uint8_t button_buf[BUTTONS]; /* button states and debouncing buffers */
-volatile uint8_t button_timeout[BUTTONS]; /* timeout, if nonzero, decrement and skip button sampling */
+#define BUTTONS 2
+volatile uint8_t button_state;              /* current button states */
+volatile uint8_t button_sample;             /* old button sample */
+volatile uint8_t button_press[BUTTONS];     /* counting button presses,
+                                             * incremented on button release */
 
 volatile uint16_t timing[376];  /* hold on/off values for the current timing */
 volatile uint16_t *current_timing;      /* pointer to the current location in the timing table */
@@ -169,32 +171,50 @@ ISR(TIMER1_COMPB_vect)
 }
 
 /* button debouncing timer */
-ISR(TIMER2_OVF_vect)
+ISR(TIMER2_COMPA_vect)
 {
-    for (uint8_t i = 0; i < BUTTONS; i++) {
-        if (button_timeout[i]) {
-            button_timeout[i]--;
-        } else {
-            button_buf[i] <<= 1;
-            switch (i) {
-                case 0: if (!(PIND & _BV(PD2)))
-                            button_buf[0] |= _BV(0);
-                        break;
-#if BUTTONS > 1
-                case 1: if (!(PIND & _BV(PD4)))
-                            button_buf[1] |= _BV(0);
-                        break;
-#endif
+    uint8_t new_sample = 0;
+
+    /* read button 1 */
+    if ((PIND & _BV(PD2)) > 0)
+        new_sample |= _BV(0);
+
+    /* read button 2 */
+    if ((PIND & _BV(PD4)) > 0)
+        new_sample |= _BV(1);
+
+    /* if something changed */
+    if (button_sample != new_sample) {
+
+        /* iterate through all the buttons */
+        for (uint8_t i = 0; i < BUTTONS; i++) {
+
+            /* check if button state is different from last two samples */
+            uint8_t s = button_sample & _BV(i);
+            if ( s ^ (button_state & _BV(i)) ) {
+                /* update button state */
+                if (s) {
+                    button_state |= _BV(i);
+                } else {
+                    /* if this is the keypress, increment button press counter */
+                    button_state &= ~_BV(i);
+                    button_press[i]++;
+                }
             }
         }
     }
 
+    /* remember sample */
+    button_sample = new_sample;
+
+    /* increment sleep counter */
     if (state == IDLE) {
         sleep_counter++;
 
         if (sleep_counter == 0)
             state = SLEEP;
     }
+
 }
 
 /* pin change interrupt 2 does nothing, enabled just for wakeup */
@@ -429,9 +449,12 @@ int main(void)
     DDRB = _BV(PB1) | _BV(PB2);
     PORTB = _BV(PB0) | _BV(PB1) | _BV(PB2);
 
-    /* init timer2 for key debouncing, prescaler 256 */
-    TCCR2B = _BV(CS22) | _BV(CS20);
-    TIMSK2 = _BV(TOIE2);
+    /* init timer2 for key debouncing, CTC, prescaler 1024,
+     * timeout after 10ms */
+    TCCR2A = _BV(WGM21);
+    TCCR2B = _BV(CS22) | _BV(CS21) | _BV(CS20);
+    TIMSK2 = _BV(OCIE2A);
+    OCR2A = F_CPU/100/1024;
 
 #ifdef DEBUG_UART
     /* uart */
@@ -450,72 +473,77 @@ int main(void)
 
     while (1)
     {
-        if (button_buf[0] == 0xff) {
-            button_buf[0] = 0;
-            button_timeout[0] = 100;
+        /* if we're idle, reset pointer and start transmitting */
+        if (state == IDLE && button_press[0] > 0) {
+            button_press[0] = 0;
 
-            /* if we're idle, reset pointer and start transmitting */
-            if (state == IDLE) {
-                pos = 0;
+            pos = 0;
 
-                current_code = &codes[0];
-                state = LOAD_CODE;
-                PORTB &= ~_BV(PB1);
-            }
+            current_code = &codes[0];
+            state = LOAD_CODE;
+            PORTB &= ~_BV(PB1);
         }
 
         if (state == LOAD_CODE) {
-#ifdef DEBUG_UART
-            UDR0 = 'L';
-            while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
-            /* load next generating function and generate timing table */
-            void (*func)(void);
-            uint16_t ptr = next_word();
-            func = (void *)ptr;
-
-            if (func != NULL && (PIND & _BV(PD4))) {
-#ifdef DEBUG_UART
-                UDR0 = 'p';
-                while(!(UCSR0A & _BV(UDRE0)));
-                UDR0 = pos++;
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
-                /* call generating function */
-                func();
-
-#ifdef DEBUG_UART
-                UDR0 = 'f';
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
-                /* reset timing pointer */
-                current_timing = &timing[0];
-
-                /* update state */
-                state = TRANSMIT_CODE;
-
-                /* init timer1 for initial delay before sending:
-                 * prescaler 256, CTC mode (TOP == OCR1A)
-                 * enable compare interrupts */
-                OCR1A = DELAY_NEXT_CODE;
-                OCR1B = 0xffff;
-                TIFR1 = _BV(OCF1A) | _BV(OCF1B);
-                TIMSK1 = _BV(OCIE1A) | _BV(OCIE1B);
-                TCCR1B = _BV(CS12) | _BV(WGM12);
-            } else {
-#ifdef DEBUG_UART
-                UDR0 = 'E';
-                while(!(UCSR0A & _BV(UDRE0)));
-#endif
-
+            /* check if button has been pressed again */
+            if (button_press[0] > 0) {
+                button_press[0] = 0;
                 PORTB |= _BV(PB1);
                 state = IDLE;
-            }
+            } else {
 
-            sleep_counter = 0;
+#ifdef DEBUG_UART
+                UDR0 = 'L';
+                while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                /* load next generating function and generate timing table */
+                void (*func)(void);
+                uint16_t ptr = next_word();
+                func = (void *)ptr;
+
+                if (func != NULL) {
+#ifdef DEBUG_UART
+                    UDR0 = 'p';
+                    while(!(UCSR0A & _BV(UDRE0)));
+                    UDR0 = pos++;
+                    while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                    /* call generating function */
+                    func();
+
+#ifdef DEBUG_UART
+                    UDR0 = 'f';
+                    while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                    /* reset timing pointer */
+                    current_timing = &timing[0];
+
+                    /* update state */
+                    state = TRANSMIT_CODE;
+
+                    /* init timer1 for initial delay before sending:
+                     * prescaler 256, CTC mode (TOP == OCR1A)
+                     * enable compare interrupts */
+                    OCR1A = DELAY_NEXT_CODE;
+                    OCR1B = 0xffff;
+                    TIFR1 = _BV(OCF1A) | _BV(OCF1B);
+                    TIMSK1 = _BV(OCIE1A) | _BV(OCIE1B);
+                    TCCR1B = _BV(CS12) | _BV(WGM12);
+                } else {
+#ifdef DEBUG_UART
+                    UDR0 = 'E';
+                    while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+                    PORTB |= _BV(PB1);
+                    state = IDLE;
+                }
+
+                sleep_counter = 0;
+            }
         }
 
         if (state == SLEEP) {
