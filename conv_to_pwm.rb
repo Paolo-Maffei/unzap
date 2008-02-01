@@ -88,7 +88,7 @@ def convert_pause(code, pwm)
 
     bits = code['bits']
 
-    if bits == 16 || bits == 12 || bits == 10 then
+    if bits <= 16 && bits >= 9 then
         puts "     0x%s," % [ (code['data'][1] * 256 + code['data'][0]).to_s(16) ]
     elsif bits == 24 then
         puts "     0x%s, 0x%s," % [(code['data'][1] * 256 + code['data'][0]).to_s(16), \

@@ -740,62 +740,40 @@
      * code db/tvbgone-134.yaml
      ***************************************************/
 
-    (uint16_t)send_raw,
+    (uint16_t)send_pause,
     /* freq 38970:    pwm8:  25 ( 40000), pwm1: 205 ( 39024)
      * error:        1030,                54
      * selected freq1 */
     /* pwm, repeat, repeat_delay */
-    (205 << 8) | 1, 11900,
-    /* pattern (on, length): */
-    37, 1762,
-    37, 1765,
-    37, 1765,
-    37, 1765,
-    37, 1765,
-    37, 1177,
-    37, 1177,
-    37, 1765,
-    37, 1765,
-    37, 1177,
-    37, 1177,
-    37, 0,
+     (205 << 8) | 1, 29000,
+    /* parameters */
+    /* header on timing, header length */
+     0x0, 0x0,
+    /* on length, length one (on+pause), length zero (on+pause) */
+     0x26, 0x6e5, 0x49a,
+    /* flags, bitcount */ 
+     0xb,
+    /* data: */
+     0x19f,
     /***************************************************
      * code db/tvbgone-135.yaml
      ***************************************************/
 
-    (uint16_t)send_raw,
+    (uint16_t)send_pause,
     /* freq 34800:    pwm8:  28 ( 35714), pwm1: 229 ( 34934)
      * error:         914,               134
      * selected freq1 */
     /* pwm, repeat, repeat_delay */
-    (229 << 8) | 1, 8878,
-    /* pattern (on, length): */
-    895, 1790,
-    222, 447,
-    222, 895,
-    222, 895,
-    222, 447,
-    222, 895,
-    222, 447,
-    222, 447,
-    222, 895,
-    222, 447,
-    222, 895,
-    222, 447,
-    222, 447,
-    222, 895,
-    222, 447,
-    222, 447,
-    222, 895,
-    222, 447,
-    222, 895,
-    222, 895,
-    222, 447,
-    222, 895,
-    222, 447,
-    222, 895,
-    222, 895,
-    222, 0,
+     (229 << 8) | 1, 27000,
+    /* parameters */
+    /* header on timing, header length */
+     0x37f, 0x6fe,
+    /* on length, length one (on+pause), length zero (on+pause) */
+     0xdf, 0x37f, 0x1c0,
+    /* flags, bitcount */ 
+     0x318,
+    /* data: */
+     0x9296, 0xd6,
     /***************************************************
      * code db/tvbgone-136.yaml
      ***************************************************/
