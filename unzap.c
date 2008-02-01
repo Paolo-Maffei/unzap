@@ -570,7 +570,7 @@ int main(void)
                     blink(BLINK_NONSILENT);
 
             } else if (button_press[0] == 0 && button_press[1] == 2) {
-                // single_step = !single_step;
+                options.single_step = !options.single_step;
 
                 /* blink for single step toggle */
                 if (options.single_step)
