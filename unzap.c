@@ -42,6 +42,7 @@ typedef enum {
                      * this might include power-down mode */
     LOAD_CODE,      /* the main loop should load the next code and execute
                      * its generating function */
+    READ_COMMAND,       /* wait for more button presses */
     TRANSMIT_CODE,  /* the system is transmitting the code currently loaded
                      * in the timing[] array */
     LAST_ON_PULSE,  /* the system is just transmitting the last on pulse, afterwards
@@ -83,6 +84,9 @@ volatile uint16_t *current_code;        /* pointer to the current location in th
 
 volatile uint8_t sleep_counter;
 
+uint8_t silent;                         /* set to one, if the transmit should
+                                         * be done without flashing leds */
+
 /*
  * prototypes
  */
@@ -92,6 +96,8 @@ uint16_t noinline next_word(void);
 void send_raw(void);
 void send_nec(void);
 void send_pause(void);
+
+void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
 
 /* helper macros */
 #define HI8(x)  ((uint8_t)((x) >> 8))
@@ -139,7 +145,8 @@ ISR(TIMER1_COMPA_vect)
     TCCR1B = _BV(CS11) | _BV(CS10) | _BV(WGM12);
 
     pwm_enable();
-    PORTB &= ~_BV(PB2);
+    if (!silent)
+        PORTB &= ~_BV(PB2);
 
     /* load on pulse duration */
     OCR1B = *current_timing++;
@@ -213,7 +220,8 @@ ISR(TIMER2_COMPA_vect)
 
         if (sleep_counter == 0)
             state = SLEEP;
-    }
+    } else
+        sleep_counter = SLEEP_COUNTER_VALUE;
 
 }
 
@@ -420,6 +428,34 @@ void send_pause(void)
     pwm_set(params.pwm);
 }
 
+/* user interface functions */
+
+/* blink out a sequence (LSB first), every bit is 200ms long */
+void noinline blink(uint8_t sequence1, uint8_t sequence2, uint8_t len) {
+    for (uint8_t i = 0; i < len; i++) {
+        /* set led1 */
+        if (sequence1 & 1)
+            PORTB &= ~_BV(PB2);
+        else
+            PORTB |= _BV(PB2);
+        sequence1 >>= 1;
+
+        /* set led2 */
+        if (sequence2 & 1)
+            PORTB &= ~_BV(PB1);
+        else
+            PORTB |= _BV(PB1);
+        sequence2 >>= 1;
+
+        /* wait 200ms */
+        for (uint8_t t = 0; t < 20; t++)
+            _delay_loop_2(F_CPU/100/4);
+    }
+
+    /* turn off leds */
+    PORTB |= _BV(PB1) | _BV(PB2);
+}
+
 /*
  * main function
  */
@@ -469,26 +505,93 @@ int main(void)
 
     sei();
 
-    uint8_t pos = 0;
+#ifdef BLINK_START
+    /* blink start sequence */
+    blink(BLINK_START);
+#endif
+
+    uint8_t pos;
+    uint8_t button_sum = 0;
 
     while (1)
     {
-        /* if we're idle, reset pointer and start transmitting */
-        if (state == IDLE && button_press[0] > 0) {
+        /* if a button has been pressed and we're idle, wait some more time to determine mode */
+        if (state == IDLE && (button_press[0] > 0 || button_press[1] > 0)) {
+
+            /* wait one second via timer1, using prescaler 1024 */
+            TIFR1 = _BV(OCF1A);
+            TCNT1 = 0;
+            OCR1A = F_CPU/1024/2;
+            TIMSK1 = 0;
+            TCCR1A = 0;
+            TCCR1B = _BV(CS12) | _BV(CS10);
+
+            button_sum = 0;
+            state = READ_COMMAND;
+        }
+
+        /* if we're waiting for a command, and some button has been pressed, reset timeout */
+        uint8_t sum = button_press[0] + button_press[1];
+        if (state == READ_COMMAND && sum != button_sum) {
+            TCNT1 = 0;
+            button_sum = sum;
+        }
+
+        /* if we're waiting for a command, check if the timer expired */
+        if (state == READ_COMMAND && (TIFR1 & _BV(OCF1A))) {
+
+            /* disable timer1 */
+            TCCR1B = 0;
+            TCNT1 = 0;
+
+            /* parse button presses */
+            if (button_press[0] == 1 && button_press[1] == 0) {
+
+                /* start transmitting */
+                pos = 0;
+
+                current_code = &codes[0];
+                state = LOAD_CODE;
+
+#ifdef BLINK_MODE1
+                /* blink mode 1 */
+                blink(BLINK_MODE1);
+#endif
+
+                if (!silent)
+                    PORTB &= ~_BV(PB1);
+            } else if (button_press[0] == 0 && button_press[1] == 1) {
+                silent = !silent;
+
+                /* blink for silent toggle */
+                if (silent)
+                    blink(BLINK_SILENT);
+                else
+                    blink(BLINK_NONSILENT);
+
+            } else {
+                blink(BLINK_INVALID);
+            }
+
+            /* reset state, if not yet done */
+            if (state == READ_COMMAND)
+                state = IDLE;
+
+            /* reset buttons */
             button_press[0] = 0;
-
-            pos = 0;
-
-            current_code = &codes[0];
-            state = LOAD_CODE;
-            PORTB &= ~_BV(PB1);
+            button_press[1] = 0;
         }
 
         if (state == LOAD_CODE) {
-            /* check if button has been pressed again */
+            /* stop sending if button1 has been pressed again */
             if (button_press[0] > 0) {
                 button_press[0] = 0;
                 PORTB |= _BV(PB1);
+
+#ifdef BLINK_MODE1_END
+                blink(BLINK_MODE1_END);
+#endif
+
                 state = IDLE;
             } else {
 
@@ -539,6 +642,11 @@ int main(void)
 #endif
 
                     PORTB |= _BV(PB1);
+
+#ifdef BLINK_MODE1_END
+                    blink(BLINK_MODE1_END);
+#endif
+
                     state = IDLE;
                 }
 
@@ -556,7 +664,7 @@ int main(void)
             sleep_enable();
             sleep_cpu();
             sleep_disable();
-            sleep_counter = 0;
+            sleep_counter = SLEEP_COUNTER_VALUE;
             state = IDLE;
 
             /* disable pin change interrupt for button 1 and 2,

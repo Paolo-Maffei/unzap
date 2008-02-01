@@ -60,4 +60,17 @@
 #define NEC_REPEAT_ON  (F_CPU/64 * 9000 / 1000000)
 #define NEC_REPEAT_OFF (F_CPU/64 * (9000+2250) / 1000000)
 
+/* wait one second before entering sleep mode (using timer2, which expires every 10ms) */
+#define SLEEP_COUNTER_VALUE 100
+
+/* blink sequences */
+#define BLINK_START 0x05, 0x02, 3
+#define BLINK_MODE1 0x01, 0x01, 3
+#define BLINK_MODE1_END 0x02, 0x04, 5
+
+#define BLINK_SILENT 0x01, 0x00, 1
+#define BLINK_NONSILENT 0x00, 0x01, 1
+
+#define BLINK_INVALID 0x3f, 0x3f, 6
+
 #endif /* _CONFIG_H */
