@@ -186,11 +186,11 @@ ISR(TIMER2_COMPA_vect)
     uint8_t new_sample = 0;
 
     /* read button 1 */
-    if ((PIND & _BV(PD2)) > 0)
+    if ((PINC & _BV(PC5)) > 0)
         new_sample |= _BV(0);
 
     /* read button 2 */
-    if ((PIND & _BV(PD4)) > 0)
+    if ((PINC & _BV(PC4)) > 0)
         new_sample |= _BV(1);
 
     /* if something changed */
@@ -229,7 +229,7 @@ ISR(TIMER2_COMPA_vect)
 }
 
 /* pin change interrupt 2 does nothing, enabled just for wakeup */
-ISR(PCINT2_vect) {}
+ISR(PCINT1_vect) {}
 
 /* helper functions */
 uint16_t noinline next_word(void)
@@ -467,26 +467,40 @@ int main(void)
     /* hardware on port D:
      * PD0: RX
      * PD1: TX
-     * PD2: BTN1
+     * PD2: D+
      * PD3: INT1/IR_IN
-     * PD4: BTN2
+     * PD4: D-
      * PD5: IR_OUT
-     * PD6: BTN3
+     * PD6: DF_CS
      */
-    DDRD = _BV(PD5);
-    PORTD = _BV(PD2) | _BV(PD4) | _BV(PD6);
+    DDRD = _BV(PD5) | _BV(PD6);
+    PORTD = _BV(PD6);
 
     /* configure pin change interrupt for button 1 and 2,
      * for waking up from sleep mode... */
-    PCMSK2 = _BV(PCINT18) | _BV(PCINT20);
+    PCMSK1 = _BV(PCINT12) | _BV(PCINT13);
 
     /* hardware on port B:
-     * PB0: BTN4
+     * PB0: PUD
      * PB1: /LED2
      * PB2: /LED1
+     * PB3: MOSI
+     * PB4: MISO
+     * PB5: SCK
      */
-    DDRB = _BV(PB1) | _BV(PB2);
-    PORTB = _BV(PB0) | _BV(PB1) | _BV(PB2);
+    DDRB = _BV(PB0) | _BV(PB1) | _BV(PB2);
+    PORTB = _BV(PB1) | _BV(PB2);
+
+    /* hardware on port C:
+     * PC0: IR_IN2
+     * PC1: POWER
+     * PC2: BTN4
+     * PC3: BTN3
+     * PC4: BTN2
+     * PC5: BTN1
+     */
+    DDRC = 0;
+    PORTC = _BV(PC2) | _BV(PC3) | _BV(PC4) | _BV(PC5);
 
     /* init timer2 for key debouncing, CTC, prescaler 1024,
      * timeout after 10ms */
@@ -494,6 +508,9 @@ int main(void)
     TCCR2B = _BV(CS22) | _BV(CS21) | _BV(CS20);
     TIMSK2 = _BV(OCIE2A);
     OCR2A = F_CPU/100/1024;
+
+    /* configure sleep mode */
+    set_sleep_mode(SLEEP_MODE_STANDBY);
 
 #ifdef DEBUG_UART
     /* uart */
@@ -522,7 +539,7 @@ int main(void)
         if (state == IDLE && (button_press[0] > 0 || button_press[1] > 0)) {
 
             /* wait one second via timer1, using prescaler 1024 */
-            TIFR1 = _BV(OCF1A);
+            TIFR1 = TIFR1;
             OCR1A = F_CPU/1024/2;
             TCCR1B = _BV(CS12) | _BV(CS10);
 
@@ -560,27 +577,28 @@ int main(void)
 
                 if (!options.silent)
                     PORTB &= ~_BV(PB1);
-            } else if (button_press[0] == 0 && button_press[1] == 1) {
-                options.silent = !options.silent;
+            } else if (button_press[0] == 0) {
+                if (button_press[1] == 1) {
+                    options.silent = !options.silent;
 
-                /* blink for silent toggle */
-                if (options.silent)
-                    blink(BLINK_SILENT);
-                else
-                    blink(BLINK_NONSILENT);
+                    /* blink for silent toggle */
+                    if (options.silent)
+                        blink(BLINK_SILENT);
+                    else
+                        blink(BLINK_NONSILENT);
 
-            } else if (button_press[0] == 0 && button_press[1] == 2) {
-                options.single_step = !options.single_step;
+                } else if (button_press[1] == 2) {
+                    options.single_step = !options.single_step;
 
-                /* blink for single step toggle */
-                if (options.single_step)
-                    blink(BLINK_STEP);
-                else
-                    blink(BLINK_NOSTEP);
-
-            } else {
+                    /* blink for single step toggle */
+                    if (options.single_step)
+                        blink(BLINK_STEP);
+                    else
+                        blink(BLINK_NOSTEP);
+                } else
+                    blink(BLINK_INVALID);
+            } else
                 blink(BLINK_INVALID);
-            }
 
             /* reset state, if not yet done */
             if (state == READ_COMMAND)
@@ -659,7 +677,7 @@ int main(void)
                      * enable compare interrupts */
                     OCR1A = DELAY_NEXT_CODE;
                     OCR1B = 0xffff;
-                    TIFR1 = _BV(OCF1A) | _BV(OCF1B);
+                    TIFR1 = TIFR1;
                     TIMSK1 = _BV(OCIE1A) | _BV(OCIE1B);
                     TCCR1B = _BV(CS12) | _BV(WGM12);
                 } else {
@@ -684,13 +702,10 @@ int main(void)
         if (state == SLEEP) {
             /* enable pin change interrupt for button 1 and 2,
              * for waking up from sleep mode... */
-            PCICR = _BV(PCIE2);
+            PCICR = _BV(PCIE1);
 
             /* set and enter sleep mode */
-            set_sleep_mode(SLEEP_MODE_STANDBY);
-            sleep_enable();
-            sleep_cpu();
-            sleep_disable();
+            sleep_mode();
             sleep_counter = SLEEP_COUNTER_VALUE;
             state = IDLE;
 
