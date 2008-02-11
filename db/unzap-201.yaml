@@ -1,0 +1,24 @@
+type: pause
+frequency: 36000
+repeat: 3
+repeat_delay: 122000
+header: [ 0, 0 ]
+on_length: 150
+pause_one: 7600
+pause_zero: 5000
+bits: 11
+flags: []
+data: [ 0xde, 0x05 ]
+comment: second bit is a toggle-bit
+pattern:
+- [   150,  4850 ] # 0
+- [   150,  7450 ] # 1, toggle bit
+- [   150,  7450 ] # 1
+- [   150,  7450 ] # 1
+- [   150,  7450 ] # 1
+- [   150,  4850 ] # 0
+- [   150,  7450 ] # 1
+- [   150,  7450 ] # 1 -> 0xde
+- [   150,  7450 ] # 1
+- [   150,  4850 ] # 0
+- [   150,  7450 ] # 1 -> 0x05

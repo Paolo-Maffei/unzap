@@ -2079,3 +2079,22 @@
     125, 250,
     125, 250,
     125, 0,
+    /***************************************************
+     * code db/unzap-201.yaml
+     ***************************************************/
+
+    (uint16_t)send_pause,
+    /* freq 36000:    pwm8:  27 ( 37037), pwm1: 222 ( 36036)
+     * error:        1037,                36
+     * selected freq1 */
+    /* pwm, repeat, repeat_delay */
+     (222 << 8) | 3, 30500,
+    /* parameters */
+    /* header on timing, header length */
+     0x0, 0x0,
+    /* on length, length one (on+pause), length zero (on+pause) */
+     0x26, 0x792, 0x508,
+    /* flags, bitcount */ 
+     0xb,
+    /* data: */
+     0x5de,
