@@ -4,8 +4,8 @@ repeat: 3
 repeat_delay: 122000
 header: [ 0, 0 ]
 on_length: 150
-pause_one: 7600
-pause_zero: 5000
+pause_one: 7450
+pause_zero: 4850
 bits: 11
 flags: []
 data: [ 0xde, 0x05 ]
