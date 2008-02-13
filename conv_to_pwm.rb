@@ -117,6 +117,13 @@ def convert_pause(code, pwm)
     end
 end
 
+def convert_rc5(code, pwm)
+    repeat = ($system_freq.to_f/$prescaler * code['repeat_delay'] / 1000000).round
+    puts "    (%d << 8) | %d, %d," % [pwm, code['repeat'], repeat]
+    puts "    /* data: */"
+    puts "    0x%s," % [ (code['data'][1] * 256 + code['data'][0]).to_s(16)]
+end
+
 code = YAML.load(open(ARGV[0]).read())
 
 # calculate pwm freq with prescalers 1 and 8
@@ -135,6 +142,8 @@ elsif code['type'] == 'nec' then
     puts "    (uint16_t)send_nec,"
 elsif code['type'] == 'pause' then
     puts "    (uint16_t)send_pause,"
+elsif code['type'] == 'rc5' then
+    puts "    (uint16_t)send_rc5,"
 else
     $stderr.puts "unknown code type: %s" % code['type']
     exit 2
@@ -163,4 +172,6 @@ elsif code['type'] == 'nec' then
     convert_nec(code, pwm)
 elsif code['type'] == 'pause' then
     convert_pause(code, pwm)
+elsif code['type'] == 'rc5' then
+    convert_rc5(code, pwm)
 end

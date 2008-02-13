@@ -1,11 +1,14 @@
-type: raw
-frequency: 34800
+type: rc5
+frequency: 36000
 repeat: 1
-repeat_delay: 116000
+repeat_delay: 114000
+data: [ 0x80, 0x01 ]
+comment: 'same like tvbgone-109'
+related: 'tvbgone-109'
 pattern:
-- [   920,   910 ]
-- [   920,   910 ]
-- [  1840,   910 ]
+- [   920,   910 ] # 01 01 01 10 10 10 10 10 10 10 01 01 10 10
+- [   920,   910 ] #  1  1  1  0  0  0  0  0  0  0  1  1  0  0
+- [  1840,   910 ] #  S  S  T  A  A  A  A  A  C  C  C  C  C  C
 - [   920,   910 ]
 - [   920,   910 ]
 - [   920,   910 ]

@@ -1,9 +1,10 @@
-type: raw
-frequency: 34800
+type: rc5
+frequency: 36000
 repeat: 1
 repeat_delay: 120000
 comment: 'same like tvbgone-109.yaml'
 related: 'tvbgone-109'
+data: [ 0x80, 0x01 ]
 pattern:
 - [   920,   920 ]
 - [  1840,   920 ]

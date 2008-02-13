@@ -71,7 +71,7 @@ struct params_t {
 volatile state_t state = IDLE;
 volatile uint8_t tccr0b;    /* holds the value for TCCR0B register, set by pwm_set() */
 
-#define BUTTONS 2
+#define BUTTONS 3
 volatile uint8_t button_state;              /* current button states */
 volatile uint8_t button_sample;             /* old button sample */
 volatile uint8_t button_press[BUTTONS];     /* counting button presses,
@@ -83,6 +83,8 @@ volatile uint16_t *current_timing;      /* pointer to the current location in th
 volatile uint16_t *current_code;        /* pointer to the current location in the code table */
 
 volatile uint8_t sleep_counter;
+
+uint8_t toggle_bit;                     /* global toggle-bit for rc5 */
 
 struct {
     uint8_t silent:1;       /* set to one, if the transmit should
@@ -99,6 +101,7 @@ uint16_t noinline next_word(void);
 void send_raw(void);
 void send_nec(void);
 void send_pause(void);
+void send_rc5(void);
 
 void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
 
@@ -192,6 +195,10 @@ ISR(TIMER2_COMPA_vect)
     /* read button 2 */
     if ((PINC & _BV(PC4)) > 0)
         new_sample |= _BV(1);
+
+    /* read button 3 */
+    if ((PINC & _BV(PC3)) > 0)
+        new_sample |= _BV(2);
 
     /* if something changed */
     if (button_sample != new_sample) {
@@ -431,6 +438,97 @@ void send_pause(void)
     pwm_set(params.pwm);
 }
 
+void send_rc5(void)
+{
+    /* load pwm timing, retransmit and retransmit timeout */
+    struct params_t params;
+    params.raw = next_word();
+    uint16_t retransmit_delay = next_word();
+
+    /* load data */
+    struct params_t dataparam;
+    dataparam.raw = next_word();
+
+    /* remember positing in timing table */
+    uint16_t pos = 0;
+
+    /* calculate retransmit timeout */
+    uint16_t retransmit = retransmit_delay;
+
+    for (uint8_t i = 0; i <= params.repeat; i++) {
+
+        retransmit = retransmit_delay -= 3*RC5_TIME;
+
+        uint16_t data = dataparam.raw;
+
+        timing[pos++] = RC5_TIME; /* on */
+        timing[pos++] = RC5_TIME; /* off */
+        timing[pos++] = RC5_TIME; /* on */
+
+        if (toggle_bit) {
+            /* insert off-on */
+            timing[pos] = RC5_TIME; /* off */
+            timing[pos+1] = RC5_TIME; /* on */
+            pos+=2;
+        } else {
+            /* insert on-off */
+            timing[pos-1] += RC5_TIME; /* double on time */
+            timing[pos] = RC5_TIME; /* off */
+            pos++;
+        }
+
+        uint8_t old_bit = toggle_bit;
+
+        /* insert data into timing array */
+        for (uint8_t b = 0; b < 11; b++) {
+
+            uint8_t bit = data & 1;
+
+            if ( bit ^ old_bit) {
+                /* if old bit and current bit are different, increase last timing */
+                timing[pos-1] += RC5_TIME;
+                timing[pos] = RC5_TIME;
+                pos++;
+                old_bit = bit;
+            } else {
+                /* else if both bits are the same, insert normal cycles */
+                timing[pos++] = RC5_TIME;
+                timing[pos++] = RC5_TIME;
+            }
+
+            /* subtract cycle length from retransmit */
+            retransmit -= 2*RC5_TIME;
+            data >>= 1;
+        }
+
+        /* if pos is even, the last period is off, insert repeat delay there */
+        if (pos % 2 == 0) {
+            timing[pos-1] = retransmit;
+        /* else the last period is on, add repeat delay as new timing */
+        } else {
+            timing[pos++] = retransmit;
+        }
+
+        /* reset retransmit delay */
+        retransmit = retransmit_delay;
+    }
+
+    /* now timing[] is an array of on-off times. iterate over it, and
+     * correct the off times */
+    for (uint8_t j = 0; j < pos; j+=2) {
+        timing[j+1] += timing[j];
+    }
+
+    /* flip toggle bit */
+    toggle_bit = !toggle_bit;
+
+    /* mark end of code */
+    timing[pos-1] = 0;
+
+    /* set loaded pwm value */
+    pwm_set(params.pwm);
+}
+
 /* user interface functions */
 
 /* blink out a sequence (LSB first), every bit is 200ms long */
@@ -607,6 +705,7 @@ int main(void)
             /* reset buttons */
             button_press[0] = 0;
             button_press[1] = 0;
+            button_press[2] = 0;
         }
 
         if (state == LOAD_CODE) {
@@ -625,6 +724,7 @@ int main(void)
 
                 /* reset buttons */
                 button_press[0] = 0;
+                button_press[2] = 0;
             }
 
             /* stop sending if button2 has been pressed */

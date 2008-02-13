@@ -60,6 +60,8 @@
 #define NEC_REPEAT_ON  (F_CPU/64 * 9000 / 1000000)
 #define NEC_REPEAT_OFF (F_CPU/64 * (9000+2250) / 1000000)
 
+#define RC5_TIME       (F_CPU/64 * 889 / 1000000)
+
 /* wait one second before entering sleep mode (using timer2, which expires every 10ms) */
 #define SLEEP_COUNTER_VALUE 100
 

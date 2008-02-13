@@ -1,14 +1,15 @@
-type: raw
-frequency: 34800
+type: rc5
+frequency: 36000
 repeat: 1
-repeat_delay: 120000
+repeat_delay: 114000
 comment: 'same like tvbgone-005.yaml'
 related: 'tvbgone-005'
+data: [ 0x80, 0x01 ]
 pattern:
-- [   920,   920 ]
-- [  1840,   920 ]
-- [   920,   920 ]
-- [   920,   920 ]
+- [   920,   920 ] # 01 01 10 10 10 10 10 10 10 10 01 01 10 10
+- [  1840,   920 ] #  1  1  0  0  0  0  0  0  0  0  1  1  0  0
+- [   920,   920 ] #  S  S  T  A  A  A  A  A  C  C  C  C  C  C
+- [   920,   920 ] #          \ -> 0x80              \ -> 0x01
 - [   920,   920 ]
 - [   920,   920 ]
 - [   920,   920 ]
