@@ -2,7 +2,7 @@
 # microcontroller and project specific settings
 TARGET = unzap
 F_CPU = 16000000UL
-MCU = atmega48
+MCU = atmega168
 HARDWARE_REV=1
 
 SRC = $(shell echo *.c)
