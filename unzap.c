@@ -81,6 +81,7 @@ volatile uint16_t timing[376];  /* hold on/off values for the current timing */
 volatile uint16_t *current_timing;      /* pointer to the current location in the timing table */
 
 volatile uint16_t *current_code;        /* pointer to the current location in the code table */
+uint16_t *single_code;                  /* pointer to the current code, in single-step mode */
 
 volatile uint8_t sleep_counter;
 
@@ -666,6 +667,7 @@ int main(void)
                 pos = 0;
 
                 current_code = &codes[0];
+                single_code = &codes[0];
                 state = LOAD_CODE;
 
 #ifdef BLINK_MODE1
@@ -712,13 +714,14 @@ int main(void)
 
             /* if we're in single-step mode, wait for a keypress */
             if (options.single_step) {
-                while (button_press[0] == 0 && button_press[1] == 0);
+                while (button_press[0] == 0 && button_press[1] == 0 && button_press[2] == 0);
 
                 /* send next code if button1 has been pressed, stop if button2
-                 * has been pressed */
-                if (button_press[1]) {
-                    button_press[1] = 1;
-                } else {
+                 * has been pressed, resend code if button3 has been pressed */
+                if (button_press[2]) {
+                    current_code = single_code;
+                    button_press[1] = 0;
+                } else if (!button_press[1]) {
                     button_press[1] = 0;
                 }
 
@@ -744,6 +747,8 @@ int main(void)
                 UDR0 = 'L';
                 while(!(UCSR0A & _BV(UDRE0)));
 #endif
+                /* if we're in single step mode, remember code address for single-retransmit */
+                single_code = current_code;
 
                 /* load next generating function and generate timing table */
                 void (*func)(void);
