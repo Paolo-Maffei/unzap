@@ -3,7 +3,7 @@
 TARGET = unzap
 F_CPU = 16000000UL
 MCU = atmega168
-HARDWARE_REV=1
+HARDWARE_REV=2
 
 SRC = $(shell echo *.c)
 OBJECTS += $(patsubst %.c,%.o,$(SRC))
