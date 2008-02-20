@@ -59,7 +59,7 @@ all:
 $(OBJECTS):
 
 clean:
-	$(RM) *.hex *.eep.hex *.o *.lst *.lss
+	$(RM) *.hex *.eep.hex *.o *.lst *.lss $(TARGET).map
 
 interactive-isp:
 	$(AVRDUDE) $(AVRDUDE_FLAGS) -c $(ISP_PROG) -P $(ISP_DEV) -t
