@@ -53,4 +53,9 @@ clean-bootloader:
 depend:
 	$(CC) $(CFLAGS) -M $(CDEFS) $(CINCS) $(SRC) $(ASRC) >> $(MAKEFILE).dep
 
+fuses-atmega48:
+	$(AVRDUDE) $(AVRDUDE_FLAGS) -c $(ISP_PROG) -P $(ISP_DEV) -e -U hfuse:w:0xD5:m -U lfuse:w:0xE7:m -U efuse:w:0x01:m
+
+bootstrap: fuses-atmega48 install
+
 -include $(MAKEFILE).dep
