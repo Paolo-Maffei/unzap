@@ -32,6 +32,9 @@
 
 #define noinline __attribute__((noinline))
 
+#define df_select() DF_PORT &= ~_BV(DF_CS_PIN)
+#define df_release() DF_PORT |= _BV(DF_CS_PIN)
+
 /*
  * structures and variables
  */
@@ -570,10 +573,10 @@ int main(void)
      * PD3: INT1/IR_IN
      * PD4: D-
      * PD5: IR_OUT
-     * PD6: DF_CS
+     * PD7: DF_CS
      */
-    DDRD = _BV(PD5) | _BV(PD6);
-    PORTD = _BV(PD6);
+    DDRD = _BV(PD5) | _BV(PD7);
+    PORTD = _BV(PD7);
 
     /* configure pin change interrupt for button 1 and 2,
      * for waking up from sleep mode... */
@@ -587,7 +590,7 @@ int main(void)
      * PB4: MISO
      * PB5: SCK
      */
-    DDRB = _BV(PB0) | _BV(PB1) | _BV(PB2);
+    DDRB = _BV(PB0) | _BV(PB1) | _BV(PB2) | _BV(PB3) | _BV(PB5);
     PORTB = _BV(PB1) | _BV(PB2);
 
     /* hardware on port C:
@@ -600,6 +603,10 @@ int main(void)
      */
     DDRC = 0;
     PORTC = _BV(PC2) | _BV(PC3) | _BV(PC4) | _BV(PC5);
+
+    /* init spi */
+    SPCR = _BV(SPE) | _BV(MSTR);
+    SPSR |= _BV(SPI2X);
 
     /* init timer2 for key debouncing, CTC, prescaler 1024,
      * timeout after 10ms */
@@ -622,12 +629,35 @@ int main(void)
     while(!(UCSR0A & _BV(UDRE0)));
 #endif
 
+    /* read dataflash status */
+    df_select();
+    SPDR = 0xd7;
+    while(!(SPSR & _BV(SPIF)));
+    SPDR = 0;
+    while(!(SPSR & _BV(SPIF)));
+
+    uint8_t df_status = SPDR;
+
+#ifdef DEBUG_UART
+    UDR0 = 'D';
+    while(!(UCSR0A & _BV(UDRE0)));
+    UDR0 = df_status;
+    while(!(UCSR0A & _BV(UDRE0)));
+#endif
+
+    df_release();
+
     sei();
 
 #ifdef BLINK_START
     /* blink start sequence */
     blink(BLINK_START);
 #endif
+
+    if (df_status == DF_STATUS_IDLE)
+        blink(BLINK_DF_SEEN);
+    else
+        blink(BLINK_DF_ERROR);
 
     uint8_t pos;
     uint8_t button_sum = 0;
