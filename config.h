@@ -43,6 +43,9 @@
  * hardware definition
  */
 
+#define DF_PORT PORTD
+#define DF_CS_PIN PD7
+#define DF_STATUS_IDLE 0xAC
 
 /*
  * timing constants
@@ -66,7 +69,7 @@
 #define SLEEP_COUNTER_VALUE 100
 
 /* blink sequences */
-#define BLINK_START 0x05, 0x02, 3
+#define BLINK_START 0x01, 0x00, 2
 #define BLINK_MODE1 0x01, 0x01, 3
 #define BLINK_MODE1_END 0x02, 0x04, 5
 #define BLINK_MODE2 0x05, 0x05, 5
@@ -79,5 +82,8 @@
 #define BLINK_NOSTEP 0x00, 0x01, 1
 
 #define BLINK_INVALID 0x3f, 0x3f, 6
+
+#define BLINK_DF_SEEN 0x01, 0, 2
+#define BLINK_DF_ERROR 0, 0x01, 2
 
 #endif /* _CONFIG_H */
