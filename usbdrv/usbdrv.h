@@ -274,12 +274,12 @@ USB_PUBLIC void usbFunctionWriteOut(uchar *data, uchar len);
                                     USB_PULLUP_DDR |= (1<<USB_CFG_PULLUP_BIT); \
                                     USB_PULLUP_OUT |= (1<<USB_CFG_PULLUP_BIT); \
                                     USB_INTR_ENABLE |= (1 << USB_INTR_ENABLE_BIT); \
-                                   } while(0);
+                                   } while(0)
 #define usbDeviceDisconnect()   do { \
                                     USB_INTR_ENABLE &= ~(1 << USB_INTR_ENABLE_BIT); \
                                     USB_PULLUP_DDR &= ~(1<<USB_CFG_PULLUP_BIT); \
                                     USB_PULLUP_OUT &= ~(1<<USB_CFG_PULLUP_BIT); \
-                                   } while(0);
+                                   } while(0)
 #else /* USB_CFG_PULLUP_IOPORTNAME */
 #define usbDeviceConnect()      (USBDDR &= ~(1<<USBMINUS))
 #define usbDeviceDisconnect()   (USBDDR |= (1<<USBMINUS))
