@@ -29,6 +29,7 @@
 #include <util/delay.h>
 
 #include "config.h"
+#include "usbdrv/usbdrv.h"
 
 #define noinline __attribute__((noinline))
 
@@ -109,6 +110,29 @@ void send_rc5(void);
 
 void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
 
+
+uchar   usbFunctionSetup(uchar data[8])
+{
+    usbRequest_t *req = (void *)data;
+    uint8_t len = 0;
+    static uint8_t buf[4];
+
+    /* set global data pointer to local buffer */
+    usbMsgPtr = buf;
+
+    return len;
+}
+
+uchar usbFunctionWrite(uchar *data, uchar len)
+{
+    return 0;
+}
+
+uchar usbFunctionRead(uchar *data, uchar len)
+{
+    return 0;
+}
+
 /* helper macros */
 #define HI8(x)  ((uint8_t)((x) >> 8))
 #define LO8(x)  ((uint8_t)(x))
@@ -120,7 +144,7 @@ void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
 /* the code table */
 uint16_t PROGMEM codes[] = \
 {
-    #include "codes.h"
+    //#include "codes.h"
 
     /* terminate this list by two nullwords */
     0, 0
@@ -239,8 +263,9 @@ ISR(TIMER2_COMPA_vect)
 
 }
 
-/* pin change interrupt 2 does nothing, enabled just for wakeup */
-ISR(PCINT1_vect) {}
+/* pin change interrupts 1 and 2 do nothing, enabled just for wakeup */
+ISR(PCINT1_vect){}
+ISR(PCINT2_vect){}
 
 /* helper functions */
 uint16_t noinline next_word(void)
@@ -578,9 +603,10 @@ int main(void)
     DDRD = _BV(PD5) | _BV(PD7);
     PORTD = _BV(PD7);
 
-    /* configure pin change interrupt for button 1 and 2,
+    /* configure pin change interrupt for button 1 and 2 and int0 pin,
      * for waking up from sleep mode... */
     PCMSK1 = _BV(PCINT12) | _BV(PCINT13);
+    PCMSK2 = _BV(PCINT18);
 
     /* hardware on port B:
      * PB0: PUD
@@ -647,6 +673,9 @@ int main(void)
 
     df_release();
 
+    /* initialize usb communication pins and interrupt */
+    usbInit();
+
     sei();
 
 #ifdef BLINK_START
@@ -659,11 +688,21 @@ int main(void)
     else
         blink(BLINK_DF_ERROR);
 
+#if 1
+    /* disconnect for ~500ms, so that the host re-enumerates this device */
+    usbDeviceDisconnect();
+    for (uint8_t i = 0; i < 31; i++)
+        _delay_loop_2(0); /* 0 means 0x10000, 31*1/f*0x10000 =~ 508ms */
+    usbDeviceConnect();
+#endif
+
     uint8_t pos;
     uint8_t button_sum = 0;
 
     while (1)
     {
+
+#if 0
         /* if a button has been pressed and we're idle, wait some more time to determine mode */
         if (state == IDLE && (button_press[0] > 0 || button_press[1] > 0)) {
 
@@ -833,11 +872,15 @@ int main(void)
                 sleep_counter = 0;
             }
         }
+#endif
 
+#if 1
         if (state == SLEEP) {
-            /* enable pin change interrupt for button 1 and 2,
+            PORTB &= ~_BV(PB1);
+
+            /* enable pin change interrupt for button 1 and 2 and int0 pin,
              * for waking up from sleep mode... */
-            PCICR = _BV(PCIE1);
+            PCICR = _BV(PCIE1) | _BV(PCIE2);
 
             /* set and enter sleep mode */
             sleep_mode();
@@ -848,6 +891,19 @@ int main(void)
              * for waking up from sleep mode... */
             PCICR = 0;
 
+            PORTB |= _BV(PB1);
         }
+#endif
+
+        if (button_press[1] > 0) {
+            usbDeviceDisconnect();
+            for (uint8_t i = 0; i < 31; i++)
+                _delay_loop_2(0); /* 0 means 0x10000, 31*1/f*0x10000 =~ 508ms */
+            usbDeviceConnect();
+            button_press[1] = 0;
+        }
+
+        /* process usb requests */
+        usbPoll();
     }
 }

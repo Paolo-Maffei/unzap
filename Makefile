@@ -5,12 +5,18 @@ F_CPU = 16000000UL
 MCU = atmega168
 HARDWARE_REV=2
 
-SRC = $(shell echo *.c)
+SRC = $(shell echo *.c) usbdrv/usbdrv.c
+ASRC = usbdrv/usbdrvasm.S
 OBJECTS += $(patsubst %.c,%.o,$(SRC))
+OBJECTS += $(patsubst %.S,%.o,${ASRC})
 HEADERS += $(shell echo *.h)
 # CFLAGS += -Werror
+CFLAGS += -I. -Iusbdrv/
 LDFLAGS += -L/usr/local/avr/avr/lib
 CFLAGS += -DHARDWARE_REV=$(HARDWARE_REV)
+ASFLAGS += -x assembler-with-cpp
+ASFLAGS += -Iusbdrv -I.
+ASFLAGS += -DHARDWARE_REV=$(HARDWARE_REV)
 
 # no safe mode checks
 AVRDUDE_FLAGS += -u
