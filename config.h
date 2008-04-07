@@ -43,9 +43,17 @@
  * hardware definition
  */
 
+#define LED_PORT PORTB
+#define LED1_PIN PB2
+#define LED2_PIN PB1
+
 #define DF_PORT PORTD
 #define DF_CS_PIN PD7
 #define DF_STATUS_IDLE 0xAC
+
+/* leave 1 second between last button press and process by mainloop */
+#define BUTTONS 4
+#define BUTTON_TIMEOUT 80
 
 /*
  * timing constants
