@@ -72,6 +72,11 @@ struct params_t {
 volatile state_t state = IDLE;
 volatile uint8_t tccr0b;    /* holds the value for TCCR0B register, set by pwm_set() */
 
+/* carrier detection */
+volatile uint8_t carrier_count;
+volatile uint8_t carrier_done;
+volatile uint8_t carrier_timer;
+
 struct buttons_t {
     uint8_t state;      /* current button states */
     uint8_t sample;     /* old button sample */
@@ -103,10 +108,8 @@ struct {
  * prototypes
  */
 
-uint16_t noinline next_word(void);
-
 void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
-
+void measure_carrier(void);
 
 /*
  * helper macros
@@ -117,8 +120,10 @@ void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
 
 #define LED1_ON() LED_PORT &= ~_BV(LED1_PIN)
 #define LED1_OFF() LED_PORT |= _BV(LED1_PIN)
+#define LED1_TOGGLE() LED_PORT ^= _BV(LED1_PIN)
 #define LED2_ON() LED_PORT &= ~_BV(LED2_PIN)
 #define LED2_OFF() LED_PORT |= _BV(LED2_PIN)
+#define LED2_TOGGLE() LED_PORT ^= _BV(LED2_PIN)
 
 #define df_select() DF_PORT &= ~_BV(DF_CS_PIN)
 #define df_release() DF_PORT |= _BV(DF_CS_PIN)
@@ -241,8 +246,47 @@ ISR(TIMER2_COMPA_vect)
     }
 }
 
-/* pin change interrupts 1 and 2 do nothing, enabled just for wakeup */
-ISR(PCINT1_vect){}
+/* carrier frequency measuring timeout */
+ISR(TIMER2_COMPB_vect)
+{
+    carrier_done = 1;
+
+    /* disable pin change interrupt and timer2 */
+    PCICR = 0;
+    TCCR2B = 0;
+
+    /* switch off led */
+    LED2_OFF();
+
+    UDR0 = 'd';
+}
+
+ISR(PCINT1_vect)
+{
+    /* enable timeout timer if this is the first edge */
+    if (carrier_count == 0) {
+        /* output compare interrupt 2 b should fire after 320 us (160 * 32 * 1/f) */
+        OCR2B = 160;
+        TIFR2 = _BV(OCF2B);
+        TIMSK2 = _BV(OCIE2B);
+        /* set prescaler to 32 */
+        TCCR2B = _BV(CS21) | _BV(CS20);
+
+        /* switch on led */
+        LED2_ON();
+
+        UDR0 = 'I';
+    }
+
+    if (carrier_count < 255)
+        carrier_count++;
+
+    carrier_timer = TCNT2;
+
+    LED1_TOGGLE();
+}
+
+/* pin change interrupts 2 does nothing, enabled just for wakeup */
 ISR(PCINT2_vect){}
 
 /* usb functions */
@@ -260,11 +304,15 @@ uchar   usbFunctionSetup(uchar data[8])
 
 uchar usbFunctionWrite(uchar *data, uchar len)
 {
+
+
     return 0;
 }
 
 uchar usbFunctionRead(uchar *data, uchar len)
 {
+
+
     return 0;
 }
 
@@ -297,6 +345,44 @@ void noinline blink(uint8_t sequence1, uint8_t sequence2, uint8_t len) {
     LED2_OFF();
 }
 
+/* high level functions */
+void measure_carrier(void)
+{
+
+    /* reset global variables */
+    carrier_count = 0;
+    carrier_done = 0;
+
+    /* reset timer 2 */
+    TCCR2A = 0;
+    TCCR2B = 0;
+    TCNT2 = 0;
+
+    /* enable pin change interrupt for IR_IN2 */
+    PCMSK1 = _BV(PCINT8);
+    PCIFR = _BV(PCIE1);
+    PCICR = _BV(PCIE1);
+
+    /* wait for measurment */
+    while (!carrier_done);
+
+    while(!(UCSR0A & _BV(UDRE0)));
+    UDR0 = 'M';
+    while(!(UCSR0A & _BV(UDRE0)));
+    UDR0 = carrier_count;
+    while(!(UCSR0A & _BV(UDRE0)));
+    UDR0 = carrier_timer;
+    while(!(UCSR0A & _BV(UDRE0)));
+
+    uint16_t freq = 3125 * (carrier_count/2);
+
+    UDR0 = HI8(freq);
+    while(!(UCSR0A & _BV(UDRE0)));
+    UDR0 = LO8(freq);
+    while(!(UCSR0A & _BV(UDRE0)));
+
+}
+
 /*
  * main function
  */
@@ -316,8 +402,8 @@ int main(void)
 
     /* configure pin change interrupt for button 1 and 2 and int0 pin,
      * for waking up from sleep mode... */
-    PCMSK1 = _BV(PCINT12) | _BV(PCINT13);
-    PCMSK2 = _BV(PCINT18);
+    //PCMSK1 = _BV(PCINT12) | _BV(PCINT13);
+    //PCMSK2 = _BV(PCINT18);
 
     /* hardware on port B:
      * PB0: PUD
@@ -345,15 +431,14 @@ int main(void)
     SPCR = _BV(SPE) | _BV(MSTR);
     SPSR |= _BV(SPI2X);
 
+#if 0
     /* init timer2 for key debouncing, CTC, prescaler 1024,
      * timeout after 10ms */
     TCCR2A = _BV(WGM21);
     TCCR2B = _BV(CS22) | _BV(CS21) | _BV(CS20);
     TIMSK2 = _BV(OCIE2A);
     OCR2A = F_CPU/100/1024;
-
-    /* init option structure */
-    opt.usb = 0;
+#endif
 
     /* init button structure */
     btn.sample = 0;
@@ -381,7 +466,7 @@ int main(void)
 
     uint8_t df_status = SPDR;
 
-#ifdef DEBUG_UART
+#ifdef DEBUG_UART_DF
     UDR0 = 'D';
     while(!(UCSR0A & _BV(UDRE0)));
     UDR0 = df_status;
@@ -405,25 +490,21 @@ int main(void)
     else
         blink(BLINK_DF_ERROR);
 
+#ifdef USB
+    usbDeviceConnect();
+    opt.usb = 1;
+#endif
+
+    measure_carrier();
+
     while (1)
     {
 
-        if (btn.done) {
-            if (btn.press[3] == 1) {
-                /* enable usb */
-
-                if (!opt.usb)
-                    usbDeviceConnect();
-                else
-                    usbDeviceDisconnect();
-
-                opt.usb ^= 1;
-            }
-
-            btn.done = 0;
-        }
-
+#ifdef USB
         /* process usb requests */
-        usbPoll();
+        if (opt.usb)
+            usbPoll();
+#endif
+
     }
 }
