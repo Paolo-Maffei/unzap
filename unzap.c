@@ -94,6 +94,7 @@ struct {
     uint8_t silent:1;       /* set to one, if the transmit should
                              * be done without flashing leds */
     uint8_t single_step:1;  /* wait for keypress between codes */
+    uint8_t ignore_bat:1;   /* ignore battery voltage */
 } options;
 
 /*
@@ -106,6 +107,8 @@ void send_raw(void);
 void send_nec(void);
 void send_pause(void);
 void send_rc5(void);
+
+uint8_t battery_voltage(void);
 
 void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
 
@@ -533,6 +536,18 @@ void send_rc5(void)
     pwm_set(params.pwm);
 }
 
+/* adc function */
+uint8_t battery_voltage(void)
+{
+    /* start conversion */
+    ADCSRA |= _BV(ADSC) | _BV(ADIF);
+
+    /* wait for conversion */
+    while(!(ADCSRA & _BV(ADIF)));
+
+    return ADCH;
+}
+
 /* user interface functions */
 
 /* blink out a sequence (LSB first), every bit is 200ms long */
@@ -552,8 +567,8 @@ void noinline blink(uint8_t sequence1, uint8_t sequence2, uint8_t len) {
             PORTB |= _BV(PB1);
         sequence2 >>= 1;
 
-        /* wait 200ms */
-        for (uint8_t t = 0; t < 20; t++)
+        /* wait 150ms */
+        for (uint8_t t = 0; t < 15; t++)
             _delay_loop_2(F_CPU/100/4);
     }
 
@@ -604,6 +619,12 @@ int main(void)
     DDRC = 0;
     PORTC = _BV(PC2) | _BV(PC3) | _BV(PC4) | _BV(PC5);
 
+    /* init analog to digital converter,
+     * convert on PC1(ADC1)
+     * prescaler 64 => 250khz frequency */
+    ADMUX = _BV(REFS0) | _BV(ADLAR) | _BV(ADIF) | _BV(MUX0);
+    ADCSRA = _BV(ADEN) | _BV(ADPS1);
+
     /* init spi */
     SPCR = _BV(SPE) | _BV(MSTR);
     SPSR |= _BV(SPI2X);
@@ -638,10 +659,17 @@ int main(void)
 
     uint8_t df_status = SPDR;
 
+    /* read battery voltage */
+    uint8_t bat = battery_voltage();
+
 #ifdef DEBUG_UART
     UDR0 = 'D';
     while(!(UCSR0A & _BV(UDRE0)));
     UDR0 = df_status;
+    while(!(UCSR0A & _BV(UDRE0)));
+    UDR0 = 'V';
+    while(!(UCSR0A & _BV(UDRE0)));
+    UDR0 = bat;
     while(!(UCSR0A & _BV(UDRE0)));
 #endif
 
@@ -658,6 +686,11 @@ int main(void)
         blink(BLINK_DF_SEEN);
     else
         blink(BLINK_DF_ERROR);
+
+    if (bat >= MIN_BAT_VOLTAGE)
+        blink(BLINK_BAT_OK);
+    else
+        blink(BLINK_BAT_FAIL);
 
     uint8_t pos;
     uint8_t button_sum = 0;
@@ -693,20 +726,25 @@ int main(void)
             /* parse button presses */
             if (button_press[0] == 1 && button_press[1] == 0) {
 
-                /* start transmitting */
-                pos = 0;
+                if (battery_voltage() < MIN_BAT_VOLTAGE && !options.ignore_bat) {
+                    blink(BLINK_VOLTAGE);
+                } else {
 
-                current_code = &codes[0];
-                single_code = &codes[0];
-                state = LOAD_CODE;
+                    /* start transmitting */
+                    pos = 0;
+
+                    current_code = &codes[0];
+                    single_code = &codes[0];
+                    state = LOAD_CODE;
 
 #ifdef BLINK_MODE1
-                /* blink mode 1 */
-                blink(BLINK_MODE1);
+                    /* blink mode 1 */
+                    blink(BLINK_MODE1);
 #endif
 
-                if (!options.silent)
-                    PORTB &= ~_BV(PB1);
+                    if (!options.silent)
+                        PORTB &= ~_BV(PB1);
+                }
             } else if (button_press[0] == 0) {
                 if (button_press[1] == 1) {
                     options.silent = !options.silent;
@@ -725,6 +763,14 @@ int main(void)
                         blink(BLINK_STEP);
                     else
                         blink(BLINK_NOSTEP);
+                } else if (button_press[1] == 3) {
+                    options.ignore_bat = !options.ignore_bat;
+
+                    /* blink for ignore battery toggle */
+                    if (options.ignore_bat)
+                        blink(BLINK_BAT_IGNORE);
+                    else
+                        blink(BLINK_BAT_HONOR);
                 } else
                     blink(BLINK_INVALID);
             } else
