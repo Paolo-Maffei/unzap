@@ -68,6 +68,9 @@
 /* wait one second before entering sleep mode (using timer2, which expires every 10ms) */
 #define SLEEP_COUNTER_VALUE 100
 
+/* minimum voltage for sending: 153/255 *5 *2 = 6V */
+#define MIN_BAT_VOLTAGE 153
+
 /* blink sequences */
 #define BLINK_START 0x01, 0x00, 2
 #define BLINK_MODE1 0x01, 0x01, 3
@@ -85,5 +88,12 @@
 
 #define BLINK_DF_SEEN 0x01, 0, 2
 #define BLINK_DF_ERROR 0, 0x01, 2
+
+#define BLINK_BAT_IGNORE 0x01, 0, 2
+#define BLINK_BAT_HONOR 0, 0x01, 2
+
+#define BLINK_BAT_OK 0x01, 0, 2
+#define BLINK_BAT_FAIL 0, 0x01, 2
+#define BLINK_VOLTAGE 0x00, 0xff, 8
 
 #endif /* _CONFIG_H */
