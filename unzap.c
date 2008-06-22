@@ -109,7 +109,6 @@ struct {
  */
 
 void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
-void measure_carrier(void);
 
 /*
  * helper macros
@@ -345,44 +344,6 @@ void noinline blink(uint8_t sequence1, uint8_t sequence2, uint8_t len) {
     LED2_OFF();
 }
 
-/* high level functions */
-void measure_carrier(void)
-{
-
-    /* reset global variables */
-    carrier_count = 0;
-    carrier_done = 0;
-
-    /* reset timer 2 */
-    TCCR2A = 0;
-    TCCR2B = 0;
-    TCNT2 = 0;
-
-    /* enable pin change interrupt for IR_IN2 */
-    PCMSK1 = _BV(PCINT8);
-    PCIFR = _BV(PCIE1);
-    PCICR = _BV(PCIE1);
-
-    /* wait for measurment */
-    while (!carrier_done);
-
-    while(!(UCSR0A & _BV(UDRE0)));
-    UDR0 = 'M';
-    while(!(UCSR0A & _BV(UDRE0)));
-    UDR0 = carrier_count;
-    while(!(UCSR0A & _BV(UDRE0)));
-    UDR0 = carrier_timer;
-    while(!(UCSR0A & _BV(UDRE0)));
-
-    uint16_t freq = 3125 * (carrier_count/2);
-
-    UDR0 = HI8(freq);
-    while(!(UCSR0A & _BV(UDRE0)));
-    UDR0 = LO8(freq);
-    while(!(UCSR0A & _BV(UDRE0)));
-
-}
-
 /*
  * main function
  */
@@ -430,15 +391,6 @@ int main(void)
     /* init spi */
     SPCR = _BV(SPE) | _BV(MSTR);
     SPSR |= _BV(SPI2X);
-
-#if 0
-    /* init timer2 for key debouncing, CTC, prescaler 1024,
-     * timeout after 10ms */
-    TCCR2A = _BV(WGM21);
-    TCCR2B = _BV(CS22) | _BV(CS21) | _BV(CS20);
-    TIMSK2 = _BV(OCIE2A);
-    OCR2A = F_CPU/100/1024;
-#endif
 
     /* init button structure */
     btn.sample = 0;
@@ -490,21 +442,10 @@ int main(void)
     else
         blink(BLINK_DF_ERROR);
 
-#ifdef USB
     usbDeviceConnect();
-    opt.usb = 1;
-#endif
-
-    measure_carrier();
 
     while (1)
     {
-
-#ifdef USB
-        /* process usb requests */
-        if (opt.usb)
-            usbPoll();
-#endif
-
+        usbPoll();
     }
 }
