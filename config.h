@@ -39,6 +39,9 @@
 #error "please define HARDWARE_REV to be either 1 or 2"
 #endif
 
+/* compile for an at45db161d as default */
+#define AT45DB161D
+
 /*
  * hardware definition
  */
@@ -49,7 +52,15 @@
 
 #define DF_PORT PORTD
 #define DF_CS_PIN PD7
-#define DF_STATUS_IDLE 0xAC
+
+#ifdef AT45DB161D
+    #define DF_STATUS_IDLE 0xAC
+
+    #define DF_PAGESIZE 512
+    #define DF_PAGES 4096
+#else
+    #error "unknown dataflash!"
+#endif
 
 /* leave 1 second between last button press and process by mainloop */
 #define BUTTONS 4

@@ -50,6 +50,7 @@ clean: clean-$(TARGET)
 
 clean-$(TARGET):
 	$(RM) $(TARGET) $(OBJECTS)
+	$(RM) *.lst usbdrv/*.lst
 
 clean-bootloader:
 	$(MAKE) -C bootloader clean
