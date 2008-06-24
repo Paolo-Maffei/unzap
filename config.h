@@ -39,19 +39,26 @@
 #error "please define HARDWARE_REV to be either 1 or 2"
 #endif
 
-/* compile for an at45db161d as default */
-#define AT45DB161D
 
 /*
  * hardware definition
  */
 
-#define LED_PORT PORTB
-#define LED1_PIN PB2
-#define LED2_PIN PB1
+#define LED_PORTNAME B
+#define LED1_PIN     2
+#define LED2_PIN     1
+
+#define BTN_PORTNAME C
+#define BTN1_PIN     5
+#define BTN2_PIN     4
+#define BTN3_PIN     3
+#define BTN4_PIN     2
 
 #define DF_PORT PORTD
 #define DF_CS_PIN PD7
+
+/* compile for an at45db161d as default */
+#define AT45DB161D
 
 #ifdef AT45DB161D
     #define DF_STATUS_IDLE 0xAC
@@ -62,47 +69,19 @@
     #error "unknown dataflash!"
 #endif
 
-/* leave 1 second between last button press and process by mainloop */
-#define BUTTONS 4
-#define BUTTON_TIMEOUT 80
 
-/*
- * timing constants
- */
+/* macros for concatenating register names (copied from avrusb) */
+#define _CONCAT(a, b)            a ## b
+#define _CONCAT_EXPANDED(a, b)   _CONCAT(a, b)
+#define _OUTPORT(name)           _CONCAT(PORT, name)
+#define _INPORT(name)            _CONCAT(PIN, name)
+#define _DDRPORT(name)           _CONCAT(DDR, name)
 
-/* wait 250ms at prescaler 256, MUST be <= 0xfffd! */
-#define DELAY_NEXT_CODE (F_CPU/256/4)
+/* define names to use in source */
+#define LED_PORT _OUTPORT(LED_PORTNAME)
+#define LED_DDR  _DDRPORT(LED_PORTNAME)
 
-/* special protocols */
-#define NEC_HEADER_ON  (F_CPU/64 * 9000 / 1000000)
-#define NEC_HEADER_OFF (F_CPU/64 * (90+45) / 10000)
-#define NEC_ON         (F_CPU/64 *  560 / 1000000)
-#define NEC_OFF_ZERO   (F_CPU/64 * 1120 / 1000000)
-#define NEC_OFF_ONE    (F_CPU/64 * 2250 / 1000000)
-#define NEC_REPEAT_ON  (F_CPU/64 * 9000 / 1000000)
-#define NEC_REPEAT_OFF (F_CPU/64 * (9000+2250) / 1000000)
-
-#define RC5_TIME       (F_CPU/64 * 889 / 1000000)
-
-/* wait one second before entering sleep mode (using timer2, which expires every 10ms) */
-#define SLEEP_COUNTER_VALUE 100
-
-/* blink sequences */
-#define BLINK_START 0x01, 0x00, 2
-#define BLINK_MODE1 0x01, 0x01, 3
-#define BLINK_MODE1_END 0x02, 0x04, 5
-#define BLINK_MODE2 0x05, 0x05, 5
-#define BLINK_MODE2_END 0x02, 0x04, 5
-
-#define BLINK_SILENT 0x01, 0x00, 1
-#define BLINK_NONSILENT 0x00, 0x01, 1
-
-#define BLINK_STEP 0x01, 0x00, 1
-#define BLINK_NOSTEP 0x00, 0x01, 1
-
-#define BLINK_INVALID 0x3f, 0x3f, 6
-
-#define BLINK_DF_SEEN 0x01, 0, 2
-#define BLINK_DF_ERROR 0, 0x01, 2
+#define BTN_PORT _OUTPORT(BTN_PORTNAME)
+#define BTN_DDR  _DDRPORT(BTN_PORTNAME)
 
 #endif /* _CONFIG_H */

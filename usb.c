@@ -31,6 +31,29 @@
 #include "debug.h"
 #include "usbdrv/usbdrv.h"
 #include "df.h"
+#include "ui.h"
+
+/* supply custom usbDeviceConnect() and usbDeviceDisconnect() macros
+ * which turn the interrupt on and off at the right times,
+ * and prevent the execution of an interrupt while the pullup resistor
+ * is switched off */
+#ifdef USB_CFG_PULLUP_IOPORTNAME
+#undef usbDeviceConnect
+#define usbDeviceConnect()      do { \
+                                    USB_PULLUP_DDR |= (1<<USB_CFG_PULLUP_BIT); \
+                                    USB_PULLUP_OUT |= (1<<USB_CFG_PULLUP_BIT); \
+                                    USB_INTR_ENABLE |= (1 << USB_INTR_ENABLE_BIT); \
+                                   } while(0);
+#undef usbDeviceDisconnect
+#define usbDeviceDisconnect()   do { \
+                                    USB_INTR_ENABLE &= ~(1 << USB_INTR_ENABLE_BIT); \
+                                    USB_PULLUP_DDR &= ~(1<<USB_CFG_PULLUP_BIT); \
+                                    USB_PULLUP_OUT &= ~(1<<USB_CFG_PULLUP_BIT); \
+                                   } while(0);
+#endif
+
+/* module-local variables */
+static uint8_t usb_status;
 
 /* usb functions */
 usbMsgLen_t usbFunctionSetup(uchar data[8])
@@ -71,3 +94,31 @@ uchar usbFunctionRead(uchar *data, uchar len)
     return 0;
 }
 
+/* api functions */
+
+void usb_init(void)
+{
+    usb_status = 0;
+
+    /* initialize usb communication pins and interrupt */
+    usbInit();
+}
+
+void usb_enable(void)
+{
+    usbDeviceConnect();
+    usb_status = 1;
+}
+
+void usb_disable(void)
+{
+    usbDeviceDisconnect();
+    usb_status = 0;
+}
+
+
+void usb_poll(void)
+{
+    if (usb_status)
+        usbPoll();
+}

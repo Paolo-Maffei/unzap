@@ -20,22 +20,24 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef __USB_H
-#define __USB_H
+#ifndef __UI_H
+#define __UI_H
 
-/* api functions */
+/* helper macros */
+#define LED1_ON() LED_PORT &= ~_BV(LED1_PIN)
+#define LED1_OFF() LED_PORT |= _BV(LED1_PIN)
+#define LED1_TOGGLE() LED_PORT ^= _BV(LED1_PIN)
+#define LED2_ON() LED_PORT &= ~_BV(LED2_PIN)
+#define LED2_OFF() LED_PORT |= _BV(LED2_PIN)
+#define LED2_TOGGLE() LED_PORT ^= _BV(LED2_PIN)
 
-/* initialize the usb stack, D+ and D- pins MUST be configured as input, with
- * pull-ups disabled, interrupts MUST be enabled AFTER calling usb_init() */
-void usb_init(void);
+/* initialize the button and led pins */
+void ui_init(void);
 
-/* start usb connection (enable pullup) */
-void usb_enable(void);
+/* blink out a sequence (LSB first), every bit is 200ms long */
+void ui_blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
 
-/* stop usb connection (disable pullup) */
-void usb_disable(void);
-
-/* poll at least every 50ms */
-void usb_poll(void);
+/* poll for user actions */
+void ui_poll(void);
 
 #endif

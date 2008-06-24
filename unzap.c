@@ -32,6 +32,7 @@
 #include "debug.h"
 #include "df.h"
 #include "usb.h"
+#include "ui.h"
 
 #ifndef noinline
 #define noinline __attribute__((noinline))
@@ -48,34 +49,6 @@
 
 /* user interface functions */
 
-/* blink out a sequence (LSB first), every bit is 200ms long */
-void noinline blink(uint8_t sequence1, uint8_t sequence2, uint8_t len)
-{
-    for (uint8_t i = 0; i < len; i++) {
-        /* set led1 */
-        if (sequence1 & 1)
-            LED1_ON();
-        else
-            LED1_OFF();
-        sequence1 >>= 1;
-
-        /* set led2 */
-        if (sequence2 & 1)
-            LED2_ON();
-        else
-            LED2_OFF();
-        sequence2 >>= 1;
-
-        /* wait 200ms */
-        for (uint8_t t = 0; t < 20; t++)
-            _delay_loop_2(F_CPU/100/4);
-    }
-
-    /* turn off leds */
-    LED1_OFF();
-    LED2_OFF();
-}
-
 /*
  * main function
  */
@@ -90,8 +63,8 @@ int main(void)
      * PD5: IR_OUT
      * PD7: DF_CS
      */
-    DDRD = _BV(PD5) | _BV(PD7);
-    PORTD = _BV(PD7);
+    //DDRD = _BV(PD5) | _BV(PD7);
+    //PORTD = _BV(PD7);
 
     /* hardware on port B:
      * PB0: PUD
@@ -101,8 +74,8 @@ int main(void)
      * PB4: MISO
      * PB5: SCK
      */
-    DDRB = _BV(PB0) | _BV(PB1) | _BV(PB2) | _BV(PB3) | _BV(PB5);
-    PORTB = _BV(PB1) | _BV(PB2);
+    //DDRB = _BV(PB0) | _BV(PB1) | _BV(PB2) | _BV(PB3) | _BV(PB5);
+    //PORTB = _BV(PB1) | _BV(PB2);
 
     /* hardware on port C:
      * PC0: IR_IN2
@@ -112,38 +85,32 @@ int main(void)
      * PC4: BTN2
      * PC5: BTN1
      */
-    DDRC = 0;
-    PORTC = _BV(PC2) | _BV(PC3) | _BV(PC4) | _BV(PC5);
+    //DDRC = 0;
+    //PORTC = _BV(PC2) | _BV(PC3) | _BV(PC4) | _BV(PC5);
 
     /* init spi */
-    SPCR = _BV(SPE) | _BV(MSTR);
-    SPSR |= _BV(SPI2X);
+    //SPCR = _BV(SPE) | _BV(MSTR);
+    //SPSR |= _BV(SPI2X);
+
+    /* init user interface */
+    ui_init();
 
     /* init debug uart */
     debug_init();
 
-    debug_putc('D');
-    debug_putc(df_status());
+    //debug_putc('D');
+    //debug_putc(df_status());
 
-#ifdef BLINK_START
-    /* blink start sequence */
-    blink(BLINK_START);
-#endif
+    /* initialize usb stack */
+    usb_init();
+    usb_enable();
 
-    if (df_status() == DF_STATUS_IDLE)
-        blink(BLINK_DF_SEEN);
-    else
-        blink(BLINK_DF_ERROR);
-
-    usbDeviceConnect();
-
-    /* initialize usb communication pins and interrupt */
-    usbInit();
-
+    /* enable interrupts */
     sei();
 
     while (1)
     {
-        usbPoll();
+        usb_poll();
+        ui_poll();
     }
 }

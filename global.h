@@ -33,18 +33,6 @@
 #define LO8(x)  ((uint8_t)(x))
 #endif
 
-#define LED1_ON() LED_PORT &= ~_BV(LED1_PIN)
-#define LED1_OFF() LED_PORT |= _BV(LED1_PIN)
-#define LED1_TOGGLE() LED_PORT ^= _BV(LED1_PIN)
-#define LED2_ON() LED_PORT &= ~_BV(LED2_PIN)
-#define LED2_OFF() LED_PORT |= _BV(LED2_PIN)
-#define LED2_TOGGLE() LED_PORT ^= _BV(LED2_PIN)
-
 /* global variables */
-
-/* helper function prototypes (will be implemented elsewhere) */
-
-/* blink a sequence */
-void blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
 
 #endif
