@@ -116,6 +116,11 @@ void usb_disable(void)
     usb_status = 0;
 }
 
+uint8_t usb_enabled(void)
+{
+    return usb_status;
+}
+
 void usb_poll(void)
 {
     if (usb_status)

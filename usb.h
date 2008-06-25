@@ -35,6 +35,8 @@ void usb_enable(void);
 /* stop usb connection (disable pullup) */
 void usb_disable(void);
 
+uint8_t usb_enabled(void);
+
 /* poll at least every 50ms */
 void usb_poll(void);
 
