@@ -20,30 +20,20 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 
-#include <stdint.h>
-#include <avr/io.h>
+/* small timer library, uses timer2 */
 
-#include "debug.h"
+#ifndef __TIMER_H
+#define __TIMER_H
 
-#ifdef DEBUG_UART
+/* structures */
+typedef struct {
+    uint8_t current;
+    uint8_t timeout;
+} timer_t;
 
-void debug_init(void)
-{
-    /* uart (115200, 8N1 at 16MHz) */
-    UBRR0H = 0;
-    UBRR0L = 8;
-    UCSR0C = _BV(UCSZ00) | _BV(UCSZ01);
-    UCSR0B = _BV(TXEN0);
-
-    debug_putc('b');
-}
-
-void debug_putc(uint8_t data)
-{
-    while(!(UCSR0A & _BV(UDRE0)));
-    UDR0 = data;
-}
-
+/* functions */
+void timer_init(void);
+void timer_set(timer_t *t, uint8_t timeout);
+uint8_t timer_expired(timer_t *t);
 
 #endif
-

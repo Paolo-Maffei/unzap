@@ -26,6 +26,7 @@
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 
+#include "usb.h"
 #include "config.h"
 #include "global.h"
 #include "debug.h"
@@ -95,7 +96,6 @@ uchar usbFunctionRead(uchar *data, uchar len)
 }
 
 /* api functions */
-
 void usb_init(void)
 {
     usb_status = 0;
@@ -115,7 +115,6 @@ void usb_disable(void)
     usbDeviceDisconnect();
     usb_status = 0;
 }
-
 
 void usb_poll(void)
 {

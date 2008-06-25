@@ -33,6 +33,7 @@
 #include "df.h"
 #include "usb.h"
 #include "ui.h"
+#include "timer.h"
 
 #ifndef noinline
 #define noinline __attribute__((noinline))
@@ -92,21 +93,26 @@ int main(void)
     //SPCR = _BV(SPE) | _BV(MSTR);
     //SPSR |= _BV(SPI2X);
 
-    /* init user interface */
-    ui_init();
-
     /* init debug uart */
     debug_init();
+
+    /* init timer library */
+    timer_init();
+
+    /* init user interface */
+    ui_init();
 
     //debug_putc('D');
     //debug_putc(df_status());
 
     /* initialize usb stack */
     usb_init();
-    usb_enable();
+    //usb_enable();
 
     /* enable interrupts */
     sei();
+
+    timer_t t;
 
     while (1)
     {
