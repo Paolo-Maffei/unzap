@@ -34,8 +34,11 @@
 /* initialize the button and led pins */
 void ui_init(void);
 
-/* blink out a sequence (LSB first), every bit is 200ms long */
-void ui_blink(uint8_t sequence1, uint8_t sequence2, uint8_t len);
+/* blink out a sequence (LSB first), every bit is 150ms long */
+void ui_blink(uint8_t sequence1, uint8_t sequence2);
+
+/* check if the current blink sequency is done */
+uint8_t ui_blinking(void);
 
 /* poll for user actions */
 void ui_poll(void);

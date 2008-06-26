@@ -26,6 +26,7 @@
 #include "ui.h"
 #include "timer.h"
 #include "debug.h"
+#include "usb.h"
 #include "pt/pt.h"
 
 /* module local variables */
@@ -34,6 +35,10 @@ static struct pt btn_thread;
 static uint8_t btn_state;
 static uint8_t btn_last_sample;
 static uint8_t btn_press;
+
+static struct pt blink_thread;
+static uint8_t blink_seq_led1;
+static uint8_t blink_seq_led2;
 
 
 /* initialize the button and led pins */
@@ -54,34 +59,26 @@ void ui_init(void)
     btn_state = _BV(BTN1_PIN) | _BV(BTN2_PIN) | _BV(BTN3_PIN) | _BV(BTN4_PIN);
     btn_last_sample = _BV(BTN1_PIN) | _BV(BTN2_PIN) | _BV(BTN3_PIN) | _BV(BTN4_PIN);
     btn_press = 0;
+
+    /* initialize blink thread and variables */
+    PT_INIT(&blink_thread);
+
+    /* no blinking at start */
+    blink_seq_led1 = 0;
+    blink_seq_led2 = 0;
 }
 
-/* blink out a sequence (LSB first), every bit is 200ms long */
-void ui_blink(uint8_t sequence1, uint8_t sequence2, uint8_t len)
+/* blink out a sequence (LSB first), every bit is 150ms long */
+void ui_blink(uint8_t sequence1, uint8_t sequence2)
 {
-    for (uint8_t i = 0; i < len; i++) {
-        /* set led1 */
-        if (sequence1 & 1)
-            LED1_ON();
-        else
-            LED1_OFF();
-        sequence1 >>= 1;
+    blink_seq_led1 = sequence1;
+    blink_seq_led2 = sequence2;
+}
 
-        /* set led2 */
-        if (sequence2 & 1)
-            LED2_ON();
-        else
-            LED2_OFF();
-        sequence2 >>= 1;
-
-        /* wait 200ms */
-        for (uint8_t t = 0; t < 20; t++)
-            _delay_loop_2(F_CPU/100/4);
-    }
-
-    /* turn off leds */
-    LED1_OFF();
-    LED2_OFF();
+/* check if the current blink sequency is done */
+uint8_t ui_blinking(void)
+{
+    return !(blink_seq_led1 || blink_seq_led2);
 }
 
 /* sample buttons, set bit in btn_press if a button has been pressed */
@@ -120,6 +117,45 @@ static PT_THREAD(ui_sample_buttons(struct pt *thread))
     PT_END(thread);
 }
 
+/* execute led blinking */
+static PT_THREAD(ui_do_blinking(struct pt *thread))
+{
+    static timer_t t;
+
+    PT_BEGIN(thread);
+
+    while (1) {
+
+        /* wait until there is something to do */
+        PT_WAIT_UNTIL(thread, blink_seq_led1 || blink_seq_led2);
+
+        /* turn leds on/off, according to blink sequence */
+        if (blink_seq_led1 & 1)
+            LED1_ON();
+        else
+            LED1_OFF();
+
+        if (blink_seq_led2 & 1)
+            LED2_ON();
+        else
+            LED2_OFF();
+
+        blink_seq_led1 >>= 1;
+        blink_seq_led2 >>= 1;
+
+        /* wait 150ms */
+        timer_set(&t, 15);
+        PT_WAIT_UNTIL(thread, timer_expired(&t));
+
+        /* turn off leds */
+        LED1_OFF();
+        LED2_OFF();
+
+    }
+
+    PT_END(thread);
+}
+
 /* poll for user actions */
 void ui_poll(void)
 {
@@ -128,6 +164,21 @@ void ui_poll(void)
 
     if (btn_press) {
         debug_putc(btn_press);
-        btn_press = 0;
     }
+
+    if (btn_press & _BV(BTN1_PIN))
+        ui_blink(1, 2);
+
+    if (btn_press & _BV(BTN4_PIN)) {
+        if (usb_enabled())
+            usb_disable();
+        else
+            usb_enable();
+    }
+
+    btn_press = 0;
+
+    /* do blinking */
+    PT_SCHEDULE(ui_do_blinking(&blink_thread));
+
 }
