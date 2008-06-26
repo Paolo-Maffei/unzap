@@ -22,10 +22,9 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/pgmspace.h>
-#include <util/delay.h>
 
 #include "config.h"
 #include "global.h"
@@ -39,80 +38,25 @@
 #define noinline __attribute__((noinline))
 #endif
 
-/*
- * prototypes
- */
+/* global variables */
+options_t cfg;
 
-/*
- * helper macros
- */
-
-
-/* user interface functions */
-
-/*
- * main function
- */
+/* main function */
 int main(void)
 {
-    /* hardware on port D:
-     * PD0: RX
-     * PD1: TX
-     * PD2: INT0/D+
-     * PD3: INT1/IR_IN
-     * PD4: D-
-     * PD5: IR_OUT
-     * PD7: DF_CS
-     */
-    //DDRD = _BV(PD5) | _BV(PD7);
-    //PORTD = _BV(PD7);
+    /* reset global variables */
+    memset(&cfg, '\0', sizeof(cfg));
 
-    /* hardware on port B:
-     * PB0: PUD
-     * PB1: /LED2
-     * PB2: /LED1
-     * PB3: MOSI
-     * PB4: MISO
-     * PB5: SCK
-     */
-    //DDRB = _BV(PB0) | _BV(PB1) | _BV(PB2) | _BV(PB3) | _BV(PB5);
-    //PORTB = _BV(PB1) | _BV(PB2);
-
-    /* hardware on port C:
-     * PC0: IR_IN2
-     * PC1: POWER
-     * PC2: BTN4
-     * PC3: BTN3
-     * PC4: BTN2
-     * PC5: BTN1
-     */
-    //DDRC = 0;
-    //PORTC = _BV(PC2) | _BV(PC3) | _BV(PC4) | _BV(PC5);
-
-    /* init spi */
-    //SPCR = _BV(SPE) | _BV(MSTR);
-    //SPSR |= _BV(SPI2X);
-
-    /* init debug uart */
     debug_init();
-
-    /* init timer library */
     timer_init();
-
-    /* init user interface */
     ui_init();
-
-    //debug_putc('D');
-    //debug_putc(df_status());
-
-    /* initialize usb stack */
     usb_init();
-    //usb_enable();
 
     /* enable interrupts */
     sei();
 
-    timer_t t;
+    /* blink start sequence */
+    ui_blink(5,2);
 
     while (1)
     {

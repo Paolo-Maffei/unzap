@@ -40,6 +40,7 @@ static struct pt blink_thread;
 static uint8_t blink_seq_led1;
 static uint8_t blink_seq_led2;
 
+static struct pt input_thread;
 
 /* initialize the button and led pins */
 void ui_init(void)
@@ -66,6 +67,9 @@ void ui_init(void)
     /* no blinking at start */
     blink_seq_led1 = 0;
     blink_seq_led2 = 0;
+
+    /* initialize input thread */
+    PT_INIT(&input_thread);
 }
 
 /* blink out a sequence (LSB first), every bit is 150ms long */
@@ -156,29 +160,47 @@ static PT_THREAD(ui_do_blinking(struct pt *thread))
     PT_END(thread);
 }
 
+/* parse input */
+static PT_THREAD(ui_input(struct pt*thread))
+{
+    static timer_t t;
+    static uint8_t option_set;
+
+    PT_BEGIN(thread);
+
+    option_set = 0;
+
+    while(1) {
+
+        if (btn_press & _BV(BTN2_PIN)) {
+            option_set++;
+            timer_set(&t, 80);
+
+        }
+
+        btn_press = 0;
+
+        if (option_set && timer_expired(&t)) {
+            debug_putc(option_set);
+            ui_blink(1, 0);
+            option_set = 0;
+        }
+
+        PT_YIELD(thread);
+    }
+
+    PT_END(thread);
+}
+
 /* poll for user actions */
 void ui_poll(void)
 {
     /* sample buttons */
     PT_SCHEDULE(ui_sample_buttons(&btn_thread));
 
-    if (btn_press) {
-        debug_putc(btn_press);
-    }
-
-    if (btn_press & _BV(BTN1_PIN))
-        ui_blink(1, 2);
-
-    if (btn_press & _BV(BTN4_PIN)) {
-        if (usb_enabled())
-            usb_disable();
-        else
-            usb_enable();
-    }
-
-    btn_press = 0;
-
     /* do blinking */
     PT_SCHEDULE(ui_do_blinking(&blink_thread));
 
+    /* process input */
+    PT_SCHEDULE(ui_input(&input_thread));
 }

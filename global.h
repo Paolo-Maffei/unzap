@@ -34,5 +34,11 @@
 #endif
 
 /* global variables */
+typedef struct {
+    uint8_t stealth:1;
+    uint8_t single_step:1;
+} options_t;
+
+extern options_t cfg;
 
 #endif
