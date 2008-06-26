@@ -39,6 +39,10 @@ typedef struct {
     uint8_t single_step:1;
 } options_t;
 
-extern options_t cfg;
+typedef struct {
+    options_t opts;
+} global_t;
+
+extern global_t global;
 
 #endif

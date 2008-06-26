@@ -39,14 +39,11 @@
 #endif
 
 /* global variables */
-options_t cfg;
+global_t global;
 
 /* main function */
 int main(void)
 {
-    /* reset global variables */
-    memset(&cfg, '\0', sizeof(cfg));
-
     debug_init();
     timer_init();
     ui_init();

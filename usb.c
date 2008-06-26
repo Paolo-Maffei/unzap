@@ -54,7 +54,7 @@
 #endif
 
 /* module-local variables */
-static uint8_t usb_status;
+static uint8_t usb_status = 0;
 
 /* usb functions */
 usbMsgLen_t usbFunctionSetup(uchar data[8])
@@ -98,8 +98,6 @@ uchar usbFunctionRead(uchar *data, uchar len)
 /* api functions */
 void usb_init(void)
 {
-    usb_status = 0;
-
     /* initialize usb communication pins and interrupt */
     usbInit();
 }

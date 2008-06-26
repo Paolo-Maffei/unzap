@@ -32,14 +32,11 @@ static volatile uint8_t internal_counter;
 
 void timer_init(void)
 {
-    internal_counter = 0;
-
     /* initialize timer2, CTC at 10ms, prescaler 1024 */
     OCR2A = F_CPU/1024/100;
     TCCR2A = _BV(WGM21);
     TCCR2B = _BV(CS22) | _BV(CS21) | _BV(CS20);
     TIMSK2 = _BV(OCIE2A);
-
 }
 
 void timer_set(timer_t *t, uint8_t timeout)

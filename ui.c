@@ -32,13 +32,14 @@
 /* module local variables */
 
 static struct pt btn_thread;
-static uint8_t btn_state;
-static uint8_t btn_last_sample;
-static uint8_t btn_press;
+/* buttons are idle at start (internal pullups active) */
+static uint8_t btn_state = _BV(BTN1_PIN) | _BV(BTN2_PIN) | _BV(BTN3_PIN) | _BV(BTN4_PIN);
+static uint8_t btn_last_sample = _BV(BTN1_PIN) | _BV(BTN2_PIN) | _BV(BTN3_PIN) | _BV(BTN4_PIN);
+static uint8_t btn_press = 0;
 
 static struct pt blink_thread;
-static uint8_t blink_seq_led1;
-static uint8_t blink_seq_led2;
+static uint8_t blink_seq_led1 = 0;
+static uint8_t blink_seq_led2 = 0;
 
 static struct pt input_thread;
 
@@ -56,17 +57,8 @@ void ui_init(void)
     /* initialize button sample thread and variables */
     PT_INIT(&btn_thread);
 
-    /* buttons are idle at start (internal pullups active) */
-    btn_state = _BV(BTN1_PIN) | _BV(BTN2_PIN) | _BV(BTN3_PIN) | _BV(BTN4_PIN);
-    btn_last_sample = _BV(BTN1_PIN) | _BV(BTN2_PIN) | _BV(BTN3_PIN) | _BV(BTN4_PIN);
-    btn_press = 0;
-
     /* initialize blink thread and variables */
     PT_INIT(&blink_thread);
-
-    /* no blinking at start */
-    blink_seq_led1 = 0;
-    blink_seq_led2 = 0;
 
     /* initialize input thread */
     PT_INIT(&input_thread);
@@ -172,11 +164,12 @@ static PT_THREAD(ui_input(struct pt*thread))
 
     while(1) {
 
-        if (btn_press & _BV(BTN2_PIN)) {
-            option_set++;
+        /* if some button has been pressed, extend reset timeout to 800ms */
+        if (btn_press)
             timer_set(&t, 80);
 
-        }
+        if (btn_press & _BV(BTN2_PIN))
+            option_set++;
 
         btn_press = 0;
 
