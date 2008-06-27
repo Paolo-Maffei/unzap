@@ -27,6 +27,7 @@
 #include "timer.h"
 #include "debug.h"
 #include "usb.h"
+#include "global.h"
 #include "pt/pt.h"
 
 /* module local variables */
@@ -160,8 +161,6 @@ static PT_THREAD(ui_input(struct pt*thread))
 
     PT_BEGIN(thread);
 
-    option_set = 0;
-
     while(1) {
 
         /* if some button has been pressed, extend reset timeout to 800ms */
@@ -175,7 +174,24 @@ static PT_THREAD(ui_input(struct pt*thread))
 
         if (option_set && timer_expired(&t)) {
             debug_putc(option_set);
-            ui_blink(1, 0);
+
+            switch (option_set) {
+                case 1: global.opts.stealth ^= 1;
+                        option_set = global.opts.stealth;
+                        break;
+                case 2: global.opts.single_step ^= 1;
+                        option_set = global.opts.single_step;
+                        break;
+                case 3: global.opts.ignore_voltage ^= 1;
+                        option_set = global.opts.ignore_voltage;
+                        break;
+            }
+
+            if (option_set)
+                ui_blink(1, 0);
+            else
+                ui_blink(0, 1);
+
             option_set = 0;
         }
 

@@ -35,8 +35,14 @@
 
 /* global variables */
 typedef struct {
-    uint8_t stealth:1;
-    uint8_t single_step:1;
+    union {
+        struct {
+            uint8_t stealth:1;
+            uint8_t single_step:1;
+            uint8_t ignore_voltage:1;
+        };
+        uint8_t raw;
+    };
 } options_t;
 
 typedef struct {
