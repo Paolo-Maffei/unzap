@@ -167,11 +167,14 @@ static PT_THREAD(ui_input(struct pt*thread))
         if (btn_press)
             timer_set(&t, 80);
 
+        /* handle button 2 press */
         if (btn_press & _BV(BTN2_PIN))
             option_set++;
 
+        /* reset button presses */
         btn_press = 0;
 
+        /* if timer expired and an option has been set, parse */
         if (option_set && timer_expired(&t)) {
             debug_putc(option_set);
 
