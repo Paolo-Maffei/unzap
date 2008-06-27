@@ -23,6 +23,7 @@
 #ifndef __GLOBAL_H
 #define __GLOBAL_H
 
+#include <stdint.h>
 
 /* helper macros */
 #ifndef HI8

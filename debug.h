@@ -23,6 +23,8 @@
 #ifndef __DEBUG_H
 #define __DEBUG_H
 
+#include <stdint.h>
+
 #ifdef DEBUG_UART
 void debug_init(void);
 void debug_putc(uint8_t data);

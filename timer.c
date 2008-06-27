@@ -45,10 +45,10 @@ void timer_set(timer_t *t, uint8_t timeout)
     t->timeout = timeout;
 }
 
-uint8_t timer_expired(timer_t *t)
+bool timer_expired(timer_t *t)
 {
     if (t->timeout == 0)
-        return 1;
+        return true;
 
     /* attention: this is not correct, if internal_counter is incremented by more than one
      * between two calls of timer_expired()! */
@@ -57,7 +57,7 @@ uint8_t timer_expired(timer_t *t)
         t->current = internal_counter;
     }
 
-    return 0;
+    return false;
 }
 
 /* timer interrupt function */

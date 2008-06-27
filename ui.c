@@ -73,7 +73,7 @@ void ui_blink(uint8_t sequence1, uint8_t sequence2)
 }
 
 /* check if the current blink sequency is done */
-uint8_t ui_blinking(void)
+bool ui_blinking(void)
 {
     return !(blink_seq_led1 || blink_seq_led2);
 }

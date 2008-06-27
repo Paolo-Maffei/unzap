@@ -25,6 +25,9 @@
 #ifndef __TIMER_H
 #define __TIMER_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 /* structures */
 typedef struct {
     uint8_t current;
@@ -34,6 +37,6 @@ typedef struct {
 /* functions */
 void timer_init(void);
 void timer_set(timer_t *t, uint8_t timeout);
-uint8_t timer_expired(timer_t *t);
+bool timer_expired(timer_t *t);
 
 #endif

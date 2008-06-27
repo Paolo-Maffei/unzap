@@ -23,6 +23,9 @@
 #ifndef __UI_H
 #define __UI_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 /* helper macros */
 #define LED1_ON() LED_PORT &= ~_BV(LED1_PIN)
 #define LED1_OFF() LED_PORT |= _BV(LED1_PIN)
@@ -38,7 +41,7 @@ void ui_init(void);
 void ui_blink(uint8_t sequence1, uint8_t sequence2);
 
 /* check if the current blink sequency is done */
-uint8_t ui_blinking(void);
+bool ui_blinking(void);
 
 /* poll for user actions */
 void ui_poll(void);

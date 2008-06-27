@@ -54,7 +54,7 @@
 #endif
 
 /* module-local variables */
-static uint8_t usb_status = 0;
+static bool usb_status = 0;
 
 /* usb functions */
 usbMsgLen_t usbFunctionSetup(uchar data[8])
@@ -105,16 +105,16 @@ void usb_init(void)
 void usb_enable(void)
 {
     usbDeviceConnect();
-    usb_status = 1;
+    usb_status = true;
 }
 
 void usb_disable(void)
 {
     usbDeviceDisconnect();
-    usb_status = 0;
+    usb_status = false;
 }
 
-uint8_t usb_enabled(void)
+bool usb_enabled(void)
 {
     return usb_status;
 }
