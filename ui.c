@@ -176,18 +176,16 @@ static PT_THREAD(ui_input(struct pt*thread))
 
         /* if timer expired and an option has been set, parse */
         if (option_set && timer_expired(&t)) {
-            debug_putc(option_set);
 
-            switch (option_set) {
-                case 1: global.opts.stealth ^= 1;
-                        option_set = global.opts.stealth;
-                        break;
-                case 2: global.opts.single_step ^= 1;
-                        option_set = global.opts.single_step;
-                        break;
-                case 3: global.opts.ignore_voltage ^= 1;
-                        option_set = global.opts.ignore_voltage;
-                        break;
+            /* compute option bit number */
+            option_set--;
+
+            if (option_set < 3) {
+                /* toggle option */
+                global.opts.raw ^= _BV(option_set);
+
+                /* blink result */
+                option_set = global.opts.raw & _BV(option_set);
             }
 
             if (option_set)
