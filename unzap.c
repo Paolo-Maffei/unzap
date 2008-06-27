@@ -53,7 +53,7 @@ int main(void)
     sei();
 
     /* blink start sequence */
-    ui_blink(5,2);
+    ui_blink(BLINK_START);
 
     while (1)
     {

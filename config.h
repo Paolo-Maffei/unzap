@@ -69,6 +69,12 @@
     #error "unknown dataflash!"
 #endif
 
+/* blink sequences */
+#define BLINK_START         0x05, 0x02
+#define BLINK_INVALID       0x3f, 0x3f
+#define BLINK_OPTION_SET    0x01, 0x00
+#define BLINK_OPTION_UNSET  0x00, 0x01
+
 
 /* macros for concatenating register names (copied from avrusb) */
 #define _CONCAT(a, b)            a ## b

@@ -177,21 +177,25 @@ static PT_THREAD(ui_input(struct pt*thread))
         /* if timer expired and an option has been set, parse */
         if (option_set && timer_expired(&t)) {
 
-            /* compute option bit number */
-            option_set--;
+            if (option_set > 3)
+                ui_blink(BLINK_INVALID);
+            else {
+                /* compute option bit number */
+                option_set--;
 
-            if (option_set < 3) {
-                /* toggle option */
-                global.opts.raw ^= _BV(option_set);
+                if (option_set < 3) {
+                    /* toggle option */
+                    global.opts.raw ^= _BV(option_set);
 
-                /* blink result */
-                option_set = global.opts.raw & _BV(option_set);
+                    /* blink result */
+                    option_set = global.opts.raw & _BV(option_set);
+                }
+
+                if (option_set)
+                    ui_blink(BLINK_OPTION_SET);
+                else
+                    ui_blink(BLINK_OPTION_UNSET);
             }
-
-            if (option_set)
-                ui_blink(1, 0);
-            else
-                ui_blink(0, 1);
 
             option_set = 0;
         }
