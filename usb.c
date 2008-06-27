@@ -70,12 +70,13 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
     for (uint8_t i = 0; i < 8; i++)
         debug_putc(data[i]);
 
-    if (req->bRequest == 0x23) {
-        buf[0] = 0x23;
-        len = 1;
-    } else if (req->bRequest == 0x24) {
-        len = req->wLength.word;
-        LED1_ON();
+    if (req->bRequest == 100) {
+        buf[0] = LO8(DF_PAGES);
+        buf[1] = HI8(DF_PAGES);
+        buf[2] = LO8(DF_PAGESIZE);
+        buf[3] = HI8(DF_PAGESIZE);
+        buf[4] = df_status();
+        len = 5;
     }
 
     return len;

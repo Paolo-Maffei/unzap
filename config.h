@@ -54,8 +54,13 @@
 #define BTN3_PIN     3
 #define BTN4_PIN     2
 
-#define DF_PORT PORTD
-#define DF_CS_PIN PD7
+#define DF_PORTNAME D
+#define DF_CS_PIN   7
+
+#define SPI_PORTNAME    B
+#define SPI_MOSI        3
+#define SPI_MISO        4
+#define SPI_SCK         5
 
 /* compile for an at45db161d as default */
 #define AT45DB161D
@@ -90,5 +95,10 @@
 #define BTN_PORT _OUTPORT(BTN_PORTNAME)
 #define BTN_DDR  _DDRPORT(BTN_PORTNAME)
 #define BTN_PIN  _INPORT(BTN_PORTNAME)
+
+#define DF_PORT  _OUTPORT(DF_PORTNAME)
+#define DF_DDR   _DDRPORT(DF_PORTNAME)
+
+#define SPI_DDR  _DDRPORT(SPI_PORTNAME)
 
 #endif /* _CONFIG_H */

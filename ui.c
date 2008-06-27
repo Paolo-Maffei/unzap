@@ -171,6 +171,17 @@ static PT_THREAD(ui_input(struct pt*thread))
         if (btn_press & _BV(BTN2_PIN))
             option_set++;
 
+        /* handle button 4 press */
+        if (btn_press & _BV(BTN4_PIN)) {
+            if (usb_enabled()) {
+                usb_disable();
+                ui_blink(0, 5);
+            } else {
+                usb_enable();
+                ui_blink(5, 0);
+            }
+        }
+
         /* reset button presses */
         btn_press = 0;
 

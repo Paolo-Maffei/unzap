@@ -34,8 +34,8 @@
 #include "ui.h"
 #include "timer.h"
 
-#ifndef noinline
-#define noinline __attribute__((noinline))
+#ifdef DEBUG
+#include <util/delay.h>
 #endif
 
 /* global variables */
@@ -44,10 +44,18 @@ global_t global;
 /* main function */
 int main(void)
 {
+#ifdef DEBUG
+    /* if compiled with debug support, wait a bit, until the
+     * isp programmer has sucessfully disconnected from the
+     * target */
+    _delay_loop_2(0);
+#endif
+
     debug_init();
     timer_init();
     ui_init();
     usb_init();
+    df_init();
 
     /* enable interrupts */
     sei();
