@@ -48,6 +48,7 @@ typedef struct {
 
 typedef struct {
     options_t opts;
+    uint8_t dataflash:1;
 } global_t;
 
 extern global_t global;

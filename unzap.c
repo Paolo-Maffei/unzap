@@ -61,11 +61,19 @@ int main(void)
     sei();
 
     /* blink start sequence */
-    ui_blink(BLINK_START);
+    uint8_t blinkgreen = 1, blinkred = 0;
+
+    if (global.dataflash)
+        blinkgreen |= _BV(2);
+    else
+        blinkred |= _BV(2);
+
+    ui_blink(blinkgreen, blinkred);
 
     while (1)
     {
         usb_poll();
         ui_poll();
+        df_poll();
     }
 }

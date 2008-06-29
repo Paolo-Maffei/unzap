@@ -68,14 +68,14 @@
 #ifdef AT45DB161D
     #define DF_STATUS_IDLE 0xAC
 
-    #define DF_PAGESIZE 512
+    #define DF_PAGESIZE 528
     #define DF_PAGES 4096
+    #define DF_CHIPID 0x0B
 #else
     #error "unknown dataflash!"
 #endif
 
 /* blink sequences */
-#define BLINK_START         0x05, 0x02
 #define BLINK_INVALID       0x3f, 0x3f
 #define BLINK_OPTION_SET    0x01, 0x00
 #define BLINK_OPTION_UNSET  0x00, 0x01

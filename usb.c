@@ -54,7 +54,17 @@
 #endif
 
 /* module-local variables */
+
+typedef enum {
+    USB_IDLE = 0,
+    USB_DF_PAGE = 1,
+} usb_action_t;
+
 static bool usb_status = 0;
+static usb_action_t usb_action;
+static uint16_t usb_df_page;
+static uint16_t usb_offset;
+static uint16_t usb_bytes_remaining;
 
 /* usb functions */
 usbMsgLen_t usbFunctionSetup(uchar data[8])
@@ -66,17 +76,38 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
     /* set global data pointer to local buffer */
     usbMsgPtr = buf;
 
-    debug_putc('S');
-    for (uint8_t i = 0; i < 8; i++)
-        debug_putc(data[i]);
-
     if (req->bRequest == 100) {
         buf[0] = LO8(DF_PAGES);
         buf[1] = HI8(DF_PAGES);
         buf[2] = LO8(DF_PAGESIZE);
         buf[3] = HI8(DF_PAGESIZE);
-        buf[4] = df_status();
-        len = 5;
+        buf[4] = df_chipid();
+        buf[5] = df_busy();
+        len = 6;
+    } else if (req->bRequest == 101) {
+        buf[0] = df_chip_erase();
+        len = 1;
+    } else if (req->bRequest == 102) {
+        buf[0] = df_page_erase(req->wValue.word);
+        len = 1;
+    } else if (req->bRequest == 103) {
+        debug_putc(df_read(req->wValue.word, req->wIndex.word, buf, 8));
+        len = 8;
+    } else if (req->bRequest == 104) {
+        if (df_busy()) {
+            len = 0;
+        } else {
+            usb_df_page = req->wValue.word;
+            usb_offset = 0;
+            usb_bytes_remaining = req->wLength.word;
+            usb_action = USB_DF_PAGE;
+
+            return USB_NO_MSG;
+        }
+    } else {
+        debug_putc('S');
+        for (uint8_t i = 0; i < 8; i++)
+            debug_putc(data[i]);
     }
 
     return len;
@@ -84,16 +115,46 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
 
 uchar usbFunctionWrite(uchar *data, uchar len)
 {
+    debug_putc('W');
+    debug_putc(len);
+    debug_putc(HI8(usb_bytes_remaining));
+    debug_putc(LO8(usb_bytes_remaining));
 
+    if (usb_bytes_remaining > len) {
+        usb_bytes_remaining -= len;
 
-    return 0;
+        /* return zero, not all bytes have been received */
+        len = 0;
+    } else {
+        debug_putc('D');
+        usb_bytes_remaining = 0;
+
+        /* return one, process no more bytes */
+        len = 1;
+    }
+
+    return len;
 }
 
 uchar usbFunctionRead(uchar *data, uchar len)
 {
+    if (usb_action == USB_DF_PAGE) {
+        debug_putc(HI8(usb_offset));
+        debug_putc(LO8(usb_offset));
 
+        if ((usb_offset+len) > DF_PAGESIZE)
+            len = (uint8_t)(DF_PAGESIZE-usb_offset);
 
-    return 0;
+        if (df_read(usb_df_page, usb_offset, data, len) != DF_OK) {
+            debug_putc('E');
+            len = 0;
+        }
+
+        usb_bytes_remaining -= len;
+        usb_offset += len;
+    }
+
+    return len;
 }
 
 /* api functions */
