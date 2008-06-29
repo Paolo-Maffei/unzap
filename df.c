@@ -42,8 +42,17 @@
 
 #define CMD_READ_FLASH 0x03
 
+#define CMD_READ_BUF1 0xd1
+#define CMD_READ_BUF2 0xd3
+
+#define CMD_WRITE_BUF1 0x84
+#define CMD_WRITE_BUF2 0x87
+
 #define CMD_LOAD_BUF1 0x53
 #define CMD_LOAD_BUF2 0x55
+
+#define CMD_SAVE_BUF1 0x83
+#define CMD_SAVE_BUF2 0x86
 
 #define cs_low()    DF_PORT &= ~_BV(DF_CS_PIN)
 #define cs_high()   DF_PORT |= _BV(DF_CS_PIN)
@@ -227,7 +236,7 @@ df_status_t df_read(uint16_t page, uint16_t offset, void *data, uint16_t length)
     return DF_OK;
 }
 
-df_status_t df_write(uint16_t page, uint16_t offset, void *data, uint16_t length)
+df_status_t df_read_buf(df_buf_t buf, uint16_t offset, void *data, uint16_t length)
 {
     if (df_chipid() != DF_CHIPID)
         return DF_NOT_FOUND;
@@ -238,17 +247,19 @@ df_status_t df_write(uint16_t page, uint16_t offset, void *data, uint16_t length
     if (length == 0)
         return DF_OK;
 
-    if (page >= DF_PAGES || (offset+length) >= DF_PAGESIZE)
+    if ((offset+length) > DF_PAGESIZE)
         return DF_ERROR;
 
     cs_low();
 
     /* send opcode */
-    spi_send(CMD_READ_FLASH);
+    if (buf == DF_BUF1)
+        spi_send(CMD_READ_BUF1);
+    else
+        spi_send(CMD_READ_BUF2);
 
-    page <<= 2;
-    spi_send(HI8(page));
-    spi_send(LO8(page) | HI8(offset));
+    spi_send(0);
+    spi_send(HI8(offset));
     spi_send(LO8(offset));
 
     uint8_t *ptr = data;
@@ -266,6 +277,93 @@ bool df_busy(void)
 {
 
     return df_action != DF_IDLE;
+}
+
+df_status_t df_load_page(uint16_t page, df_buf_t buf)
+{
+    if (df_chipid() != DF_CHIPID)
+        return DF_NOT_FOUND;
+
+    if (df_action)
+        return DF_BUSY;
+
+    if (page >= DF_PAGES)
+        return DF_ERROR;
+
+    cs_low();
+    if (buf == DF_BUF1)
+        spi_send(CMD_LOAD_BUF1);
+    else
+        spi_send(CMD_LOAD_BUF2);
+
+    page <<= 2;
+    spi_send(HI8(page));
+    spi_send(LO8(page));
+    spi_send(0);
+
+    cs_high();
+
+    df_action = DF_WAIT;
+
+    return DF_PROCESSING;
+}
+
+df_status_t df_write_buf(df_buf_t buf, uint16_t offset, void *data, uint16_t length)
+{
+    if (df_chipid() != DF_CHIPID)
+        return DF_NOT_FOUND;
+
+    if (df_action)
+        return DF_BUSY;
+
+    cs_low();
+
+    if (buf == DF_BUF1)
+        spi_send(CMD_WRITE_BUF1);
+    else
+        spi_send(CMD_WRITE_BUF2);
+
+    spi_send(0);
+    spi_send(HI8(offset));
+    spi_send(LO8(offset));
+
+    uint8_t *ptr = data;
+    do {
+        spi_send(*ptr++);
+    } while (--length > 0);
+
+    cs_high();
+
+    return DF_OK;
+}
+
+df_status_t df_save_buf(df_buf_t buf, uint16_t page)
+{
+    if (df_chipid() != DF_CHIPID)
+        return DF_NOT_FOUND;
+
+    if (df_action)
+        return DF_BUSY;
+
+    if (page >= DF_PAGES)
+        return DF_ERROR;
+
+    cs_low();
+    if (buf == DF_BUF1)
+        spi_send(CMD_SAVE_BUF1);
+    else
+        spi_send(CMD_SAVE_BUF2);
+
+    page <<= 2;
+    spi_send(HI8(page));
+    spi_send(LO8(page));
+    spi_send(0);
+
+    cs_high();
+
+    df_action = DF_WAIT;
+
+    return DF_PROCESSING;
 }
 
 static PT_THREAD(df_work(struct pt *thread))

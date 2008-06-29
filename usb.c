@@ -76,34 +76,40 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
     /* set global data pointer to local buffer */
     usbMsgPtr = buf;
 
-    if (req->bRequest == 100) {
+    if (req->bRequest == USBRQ_ECHO) {
+        buf[0] = req->wValue.bytes[0];
+        buf[1] = req->wValue.bytes[1];
+        len = 2;
+    } else if (req->bRequest == USBRQ_GET_DATAFLASH_INFO) {
         buf[0] = LO8(DF_PAGES);
         buf[1] = HI8(DF_PAGES);
         buf[2] = LO8(DF_PAGESIZE);
         buf[3] = HI8(DF_PAGESIZE);
         buf[4] = df_chipid();
-        buf[5] = df_busy();
-        len = 6;
-    } else if (req->bRequest == 101) {
+        len = 5;
+    } else if (req->bRequest == USBRQ_GET_DATAFLASH_STATUS) {
+        buf[0] = df_busy();
+        len = 1;
+    } else if (req->bRequest == USBRQ_READ_WRITE_DATAFLASH) {
+        /* wait until the dataflash is ready */
+        while(df_busy());
+
+        usb_df_page = req->wValue.word;
+        usb_offset = req->wIndex.word;
+        usb_bytes_remaining = req->wLength.word;
+        usb_action = USB_DF_PAGE;
+
+        /* if this is an out request, load old page to buffer 1 */
+        if (!(req->bmRequestType & _BV(7)))
+            df_load_page(usb_df_page, DF_BUF1);
+
+        return USB_NO_MSG;
+    } else if (req->bRequest == USBRQ_DATAFLASH_ERASE) {
         buf[0] = df_chip_erase();
         len = 1;
-    } else if (req->bRequest == 102) {
+    } else if (req->bRequest == USBRQ_DATAFLASH_ERASE_PAGE) {
         buf[0] = df_page_erase(req->wValue.word);
         len = 1;
-    } else if (req->bRequest == 103) {
-        debug_putc(df_read(req->wValue.word, req->wIndex.word, buf, 8));
-        len = 8;
-    } else if (req->bRequest == 104) {
-        if (df_busy()) {
-            len = 0;
-        } else {
-            usb_df_page = req->wValue.word;
-            usb_offset = 0;
-            usb_bytes_remaining = req->wLength.word;
-            usb_action = USB_DF_PAGE;
-
-            return USB_NO_MSG;
-        }
     } else {
         debug_putc('S');
         for (uint8_t i = 0; i < 8; i++)
@@ -115,23 +121,30 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
 
 uchar usbFunctionWrite(uchar *data, uchar len)
 {
-    debug_putc('W');
-    debug_putc(len);
-    debug_putc(HI8(usb_bytes_remaining));
-    debug_putc(LO8(usb_bytes_remaining));
+    if (len > usb_bytes_remaining)
+        len = usb_bytes_remaining;
 
-    if (usb_bytes_remaining > len) {
-        usb_bytes_remaining -= len;
+    usb_bytes_remaining -= len;
 
-        /* return zero, not all bytes have been received */
+    if (usb_action == USB_DF_PAGE) {
+        /* wait until the dataflash is ready again */
+        while(df_busy());
+
+        df_write_buf(DF_BUF1, usb_offset, data, len);
+
+        usb_offset += len;
+
+        if (usb_bytes_remaining == 0) {
+            len = 1;
+            /* write this page */
+            df_save_buf(DF_BUF1, usb_df_page);
+        } else
+            len = 0;
+    } else
         len = 0;
-    } else {
-        debug_putc('D');
-        usb_bytes_remaining = 0;
 
-        /* return one, process no more bytes */
-        len = 1;
-    }
+    if (len == 1)
+        usb_action = USB_IDLE;
 
     return len;
 }
@@ -139,20 +152,22 @@ uchar usbFunctionWrite(uchar *data, uchar len)
 uchar usbFunctionRead(uchar *data, uchar len)
 {
     if (usb_action == USB_DF_PAGE) {
-        debug_putc(HI8(usb_offset));
-        debug_putc(LO8(usb_offset));
+        /* wait until the dataflash is ready again */
+        while(df_busy());
 
         if ((usb_offset+len) > DF_PAGESIZE)
-            len = (uint8_t)(DF_PAGESIZE-usb_offset);
+            len = LO8(DF_PAGESIZE-usb_offset);
 
-        if (df_read(usb_df_page, usb_offset, data, len) != DF_OK) {
-            debug_putc('E');
+        if (df_read(usb_df_page, usb_offset, data, len) != DF_OK)
             len = 0;
-        }
 
         usb_bytes_remaining -= len;
         usb_offset += len;
-    }
+    } else
+        len = 0;
+
+    if (len == 0)
+        usb_action = USB_IDLE;
 
     return len;
 }

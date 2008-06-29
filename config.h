@@ -81,6 +81,15 @@
 #define BLINK_OPTION_UNSET  0x00, 0x01
 
 
+/* usb api */
+#define USBRQ_ECHO                      1
+#define USBRQ_GET_DATAFLASH_INFO        2
+#define USBRQ_GET_DATAFLASH_STATUS      3
+#define USBRQ_READ_WRITE_DATAFLASH      4
+#define USBRQ_DATAFLASH_ERASE           5
+#define USBRQ_DATAFLASH_ERASE_PAGE      6
+
+
 /* macros for concatenating register names (copied from avrusb) */
 #define _CONCAT(a, b)            a ## b
 #define _CONCAT_EXPANDED(a, b)   _CONCAT(a, b)

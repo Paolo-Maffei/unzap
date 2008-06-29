@@ -34,6 +34,11 @@ typedef enum {
     DF_ERROR = 4,
 } df_status_t;
 
+typedef enum {
+    DF_BUF1 = 0,
+    DF_BUF2 = 1,
+} df_buf_t;
+
 void df_init(void);
 void df_poll(void);
 
@@ -42,7 +47,10 @@ uint8_t df_chipid(void);
 df_status_t df_chip_erase(void);
 df_status_t df_page_erase(uint16_t page);
 df_status_t df_read(uint16_t page, uint16_t offset, void *data, uint16_t length);
-df_status_t df_write(uint16_t page, uint16_t offset, void *data, uint16_t length);
+df_status_t df_read_buf(df_buf_t buf, uint16_t offset, void *data, uint16_t length);
+df_status_t df_load_page(uint16_t page, df_buf_t buf);
+df_status_t df_write_buf(df_buf_t buf, uint16_t offset, void *data, uint16_t length);
+df_status_t df_save_buf(df_buf_t buf, uint16_t page);
 bool df_busy(void);
 
 #endif
