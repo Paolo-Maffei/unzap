@@ -89,6 +89,8 @@
 #define USBRQ_DATAFLASH_ERASE           5
 #define USBRQ_DATAFLASH_ERASE_PAGE      6
 
+#define USBRQ_DEBUG_GETMEM              200
+
 
 /* macros for concatenating register names (copied from avrusb) */
 #define _CONCAT(a, b)            a ## b

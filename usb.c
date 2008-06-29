@@ -33,6 +33,7 @@
 #include "usbdrv/usbdrv.h"
 #include "df.h"
 #include "ui.h"
+#include "mem-check.h"
 
 /* supply custom usbDeviceConnect() and usbDeviceDisconnect() macros
  * which turn the interrupt on and off at the right times,
@@ -110,6 +111,13 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
     } else if (req->bRequest == USBRQ_DATAFLASH_ERASE_PAGE) {
         buf[0] = df_page_erase(req->wValue.word);
         len = 1;
+#ifdef DEBUG
+    } else if (req->bRequest == USBRQ_DEBUG_GETMEM) {
+        uint16_t mem = get_mem_unused();
+        buf[0] = HI8(mem);
+        buf[1] = LO8(mem);
+        len = 2;
+#endif
     } else {
         debug_putc('S');
         for (uint8_t i = 0; i < 8; i++)
