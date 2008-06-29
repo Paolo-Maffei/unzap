@@ -25,7 +25,7 @@
 
 #include "debug.h"
 
-#ifdef DEBUG_UART
+#ifdef DEBUG
 
 void debug_init(void)
 {

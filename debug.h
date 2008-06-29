@@ -25,7 +25,7 @@
 
 #include <stdint.h>
 
-#ifdef DEBUG_UART
+#ifdef DEBUG
 void debug_init(void);
 void debug_putc(uint8_t data);
 #else
