@@ -83,7 +83,6 @@ static PT_THREAD(ui_sample_buttons(struct pt *thread))
 {
     /* make sure no variable is created on the stack */
     static timer_t btn_timer;
-    static uint8_t btn_sample;
 
     PT_BEGIN(thread);
 
@@ -94,7 +93,8 @@ static PT_THREAD(ui_sample_buttons(struct pt *thread))
         PT_WAIT_UNTIL(thread, timer_expired(&btn_timer));
 
         /* sample buttons */
-        btn_sample = BTN_PIN & (_BV(BTN1_PIN) | _BV(BTN2_PIN) | _BV(BTN3_PIN) | _BV(BTN4_PIN));
+        /* ATTENTION: make SURE, btn_sample is NOT created on the stack! */
+        register uint8_t btn_sample = BTN_PIN & (_BV(BTN1_PIN) | _BV(BTN2_PIN) | _BV(BTN3_PIN) | _BV(BTN4_PIN));
 
         /* mark bits which stayed the same since last sample */
         btn_last_sample ^= ~btn_sample;
