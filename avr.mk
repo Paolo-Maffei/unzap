@@ -37,7 +37,7 @@ endif
 AVRDUDE_FLAGS += -p $(AVRDUDE_MCU) -b $(AVRDUDE_BAUDRATE)
 
 # flags for the compiler
-CFLAGS += -g -Os -finline-limit=800 -mmcu=$(MCU) -DF_CPU=$(F_CPU) -std=gnu99
+CFLAGS += -g -Os -finline-limit=800 -mmcu=$(MCU) -DF_CPU=$(F_CPU) -std=gnu99 -fshort-enums
 ASFLAGS += -g -mmcu=$(MCU) -DF_CPU=$(F_CPU)
 
 # flags for the linker
