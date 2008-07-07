@@ -89,6 +89,11 @@
 #define USBRQ_DATAFLASH_ERASE           5
 #define USBRQ_DATAFLASH_ERASE_PAGE      6
 
+#define USBRQ_IR_STATUS                 10
+#define USBRQ_IR_RECORD                 11
+#define USBRQ_IR_PLAY                   12
+#define USBRQ_IR_READ_DATA              13
+
 #define USBRQ_DEBUG_GETMEM              200
 
 

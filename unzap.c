@@ -33,6 +33,7 @@
 #include "usb.h"
 #include "ui.h"
 #include "timer.h"
+#include "ir.h"
 
 #ifdef DEBUG
 #include <util/delay.h>
@@ -56,6 +57,7 @@ int main(void)
     ui_init();
     usb_init();
     df_init();
+    ir_init();
 
     /* enable interrupts */
     sei();
@@ -72,6 +74,7 @@ int main(void)
 
     while (1)
     {
+        ir_poll();
         usb_poll();
         ui_poll();
         df_poll();

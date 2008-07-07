@@ -20,43 +20,10 @@
  * http://www.gnu.org/copyleft/gpl.html
  */
 
-#ifndef __GLOBAL_H
-#define __GLOBAL_H
+#ifndef __IR_H
+#define __IR_H
 
-#include <stdint.h>
-
-/* helper macros */
-#ifndef HI8
-#define HI8(x)  ((uint8_t)((x) >> 8))
-#endif
-
-#ifndef LO8
-#define LO8(x)  ((uint8_t)(x))
-#endif
-
-/* global variables */
-typedef struct {
-    union {
-        struct {
-            uint8_t stealth:1;
-            uint8_t single_step:1;
-            uint8_t ignore_voltage:1;
-        };
-        uint8_t raw;
-    };
-} options_t;
-
-typedef enum {
-    MODE_PLAY = 0,
-    MODE_RECORD,
-} system_mode_t;
-
-typedef struct {
-    options_t opts;
-    system_mode_t mode;
-    uint8_t dataflash:1;
-} global_t;
-
-extern global_t global;
+void ir_init(void);
+void ir_poll(void);
 
 #endif

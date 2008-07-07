@@ -20,6 +20,11 @@ class Unzap:
     USBRQ_DATAFLASH_ERASE           = 5
     USBRQ_DATAFLASH_ERASE_PAGE      = 6
 
+    USBRQ_IR_STATUS                 = 10
+    USBRQ_IR_RECORD                 = 11
+    USBRQ_IR_PLAY                   = 12
+    USBRQ_IR_READ_DATA              = 13
+
     # dataflash return values
     DF_OK = 0
     DF_PROCESSING = 1
@@ -89,6 +94,16 @@ class Unzap:
 
     def write_page(self, page, offset, data):
         self.control_msg_out(self.USBRQ_READ_WRITE_DATAFLASH, value = page, index = offset, data = data)
+
+    def record_status(self):
+        return self.control_msg_in(self.USBRQ_IR_STATUS, data = 1)[0]
+
+    def record(self):
+        self.control_msg_out(self.USBRQ_IR_RECORD)
+
+    def read_recorded(self):
+        response = self.control_msg_in(self.USBRQ_IR_READ_DATA, data = 600)
+        return response
 
     # high level functions
     def identify_dataflash(self):
@@ -285,6 +300,19 @@ if __name__ == "__main__":
             sys.stdout.flush()
 
         print "done"
+    elif args[0] == "status":
+        print unzap.record_status()
+    elif args[0] == "record":
+        unzap.record()
+    elif args[0] == "read_recorded":
+        data = list(unzap.read_recorded())
+
+        while len(data) > 0:
+            l = data[0] + data[1] * 256
+            l *= 16
+            print l
+            del(data[0:2])
+
     else:
         print "nothing to do..."
         sys.exit(0)

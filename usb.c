@@ -34,6 +34,7 @@
 #include "df.h"
 #include "ui.h"
 #include "mem-check.h"
+#include "ir.h"
 
 /* supply custom usbDeviceConnect() and usbDeviceDisconnect() macros
  * which turn the interrupt on and off at the right times,
@@ -59,6 +60,7 @@
 typedef enum {
     USB_IDLE = 0,
     USB_DF_PAGE = 1,
+    USB_IR_DATA = 2,
 } usb_action_t;
 
 static bool usb_status = 0;
@@ -111,6 +113,25 @@ usbMsgLen_t usbFunctionSetup(uchar data[8])
     } else if (req->bRequest == USBRQ_DATAFLASH_ERASE_PAGE) {
         buf[0] = df_page_erase(req->wValue.word);
         len = 1;
+#if 0
+    } else if (req->bRequest == USBRQ_IR_STATUS) {
+        buf[0] = global.mode;
+        len = 1;
+    } else if (req->bRequest == USBRQ_IR_RECORD) {
+        global.mode = MODE_RECORD;
+        ui_blink(0, 0x33);
+    } else if (req->bRequest == USBRQ_IR_READ_DATA) {
+        if (global.mode == MODE_PLAY && timing_top > 0) {
+            usb_offset = 0;
+            usb_action = USB_IR_DATA;
+            return USB_NO_MSG;
+        }
+
+    } else if (req->bRequest == 123) {
+        for (uint8_t i = 0; i < IR_TIMESLOTS; i++)
+            timing[i] = i;
+        timing_top = IR_TIMESLOTS;
+#endif
 #ifdef DEBUG
     } else if (req->bRequest == USBRQ_DEBUG_GETMEM) {
         uint16_t mem = get_mem_unused();
@@ -171,6 +192,17 @@ uchar usbFunctionRead(uchar *data, uchar len)
 
         usb_bytes_remaining -= len;
         usb_offset += len;
+#if 0
+    } else if (usb_action == USB_IR_DATA) {
+        uint8_t *t = timing;
+
+        if (usb_offset+len > timing_top*2)
+            len = 2*timing_top-usb_offset;
+
+        for (uint8_t i = 0; i < len; i++) {
+            *data++ = t[usb_offset++];
+        }
+#endif
     } else
         len = 0;
 

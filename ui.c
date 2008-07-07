@@ -167,18 +167,32 @@ static PT_THREAD(ui_input(struct pt*thread))
         if (btn_press)
             timer_set(&t, 80);
 
-        /* handle button 2 press */
-        if (btn_press & _BV(BTN2_PIN))
-            option_set++;
-
-        /* handle button 4 press */
-        if (btn_press & _BV(BTN4_PIN)) {
-            if (usb_enabled()) {
-                usb_disable();
-                ui_blink(0, 5);
+        /* handle button 3 press */
+        if (btn_press & _BV(BTN3_PIN)) {
+            if (global.mode == MODE_PLAY) {
+                global.mode = MODE_RECORD;
+                ui_blink(0, 0x33);
             } else {
-                usb_enable();
-                ui_blink(5, 0);
+                global.mode = MODE_PLAY;
+                ui_blink(0x33, 0);
+            }
+        }
+
+        /* handle button presses in play mode */
+        if (global.mode == MODE_PLAY) {
+            /* handle button 2 press */
+            if (btn_press & _BV(BTN2_PIN))
+                option_set++;
+
+            /* handle button 4 press */
+            if (btn_press & _BV(BTN4_PIN)) {
+                if (usb_enabled()) {
+                    usb_disable();
+                    ui_blink(0, 5);
+                } else {
+                    usb_enable();
+                    ui_blink(5, 0);
+                }
             }
         }
 
