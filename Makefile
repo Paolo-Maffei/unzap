@@ -1,63 +1,168 @@
+####################################################
+# 'make' configuration file for avr-gcc
+# by fd0@koeln.ccc.de
+####################################################
 
-# microcontroller and project specific settings
-TARGET = unzap
-F_CPU = 16000000UL
+# controller
 MCU = atmega168
-HARDWARE_REV=2
 
+# frequency
+F_CPU = 16000000UL
+
+# main application name (without .hex)
+# eg 'test' when the main function is defined in 'test.c'
+TARGET = unzap
+
+# c sourcecode files
+# eg. 'test.c foo.c foobar/baz.c'
 SRC = $(shell echo *.c) usbdrv/usbdrv.c
+
+# asm sourcecode files
+# eg. 'interrupts.S foobar/another.S'
 ASRC = usbdrv/usbdrvasm.S
+
+# headers which should be considered when recompiling
+# eg. 'global.h foobar/important.h'
+HEADERS =
+
+# include directories (used for both, c and asm)
+# eg '. usbdrv/'
+INCLUDES = . usbdrv
+
+
+# use more debug-flags when compiling
+DEBUG = 1
+
+
+# hardware version is 2
+HARDWARE_REV = 2
+
+
+CFLAGS += -DHARDWARE_REV=2
+ASFLAGS += -DHARDWARE_REV=2
+
+
+# avrdude programmer protocol
+PROG = usbasp
+# avrdude programmer device
+DEV = usb
+# further flags for avrdude
+AVRDUDE_FLAGS =
+
+####################################################
+# 'make' configuration
+####################################################
+CC = avr-gcc
+OBJCOPY = avr-objcopy
+OBJDUMP = avr-objdump
+AS = avr-as
+SIZE = avr-size
+CP = cp
+RM = rm -f
+AVRDUDE = avrdude
+
+# flags for the compiler (for .c files)
+CFLAGS += -g -Os -mmcu=$(MCU) -DF_CPU=$(F_CPU) -std=gnu99 -fshort-enums
+CFLAGS += $(addprefix -I,$(INCLUDES))
+# flags for the compiler (for .S files)
+ASFLAGS += -g -mmcu=$(MCU) -DF_CPU=$(F_CPU) -x assembler-with-cpp
+ASFLAGS += $(addprefix -I,$(INCLUDES))
+# flags for the linker
+LDFLAGS += -mmcu=$(MCU)
+
+# fill in object files
 OBJECTS += $(patsubst %.c,%.o,$(SRC))
-OBJECTS += $(patsubst %.S,%.o,${ASRC})
-HEADERS += $(shell echo *.h)
-# CFLAGS += -Werror
-CFLAGS += -I. -Iusbdrv/
-LDFLAGS += -L/usr/local/avr/avr/lib
-CFLAGS += -DHARDWARE_REV=$(HARDWARE_REV)
-ASFLAGS += -x assembler-with-cpp
-ASFLAGS += -Iusbdrv -I.
-ASFLAGS += -DHARDWARE_REV=$(HARDWARE_REV)
+OBJECTS += $(patsubst %.S,%.o,$(ASRC))
 
-# no safe mode checks
-AVRDUDE_FLAGS += -u
+# include config file
+-include $(CURDIR)/config.mk
 
-# set name for dependency-file
-MAKEFILE = Makefile
+# include more debug flags, if $(DEBUG) is 1
+ifeq ($(DEBUG),1)
+	CFLAGS += -Wall -W -Wchar-subscripts -Wmissing-prototypes
+	CFLAGS += -Wmissing-declarations -Wredundant-decls
+	CFLAGS += -Wstrict-prototypes -Wshadow -Wbad-function-cast
+	CFLAGS += -Winline -Wpointer-arith -Wsign-compare
+	CFLAGS += -Wunreachable-code -Wdisabled-optimization
+	CFLAGS += -Wcast-align -Wwrite-strings -Wnested-externs -Wundef
+	CFLAGS += -Wa,-adhlns=$(basename $@).lst
+	CFLAGS += -DDEBUG
+endif
 
-include avr.mk
+####################################################
+# avrdude configuration
+####################################################
+ifeq ($(MCU),atmega8)
+	AVRDUDE_MCU=m8
+endif
+ifeq ($(MCU),atmega48)
+	AVRDUDE_MCU=m48
+endif
+ifeq ($(MCU),atmega88)
+	AVRDUDE_MCU=m88
+endif
+ifeq ($(MCU),atmega168)
+	AVRDUDE_MCU=m168
+endif
 
-.PHONY: all
+AVRDUDE_FLAGS += -p $(AVRDUDE_MCU)
 
-all: $(TARGET).hex $(TARGET).eep.hex $(TARGET).lss
-	@echo "==============================="
-	@echo "$(TARGET) compiled for: $(MCU)"
-	@echo -n "size is: "
-	@$(SIZE) -A $(TARGET).hex | grep "\.sec1" | tr -s " " | cut -d" " -f2
-	@echo "==============================="
+# configuration for automatic dependency detection
+MAKEFILE_NAME = $(realpath $(firstword $(MAKEFILE_LIST)))
 
-$(TARGET): $(OBJECTS) $(TARGET).o
+####################################################
+# make targets
+####################################################
 
-%.o: $(HEADERS)
+.PHONY: all clean distclean avrdude-terminal depend
 
-.PHONY: install
+# main rule
+all: $(TARGET).hex
 
-# install: program-serial-$(TARGET) program-serial-eeprom-$(TARGET)
-install: program-isp-$(TARGET)
+$(TARGET).elf: $(OBJECTS) $(TARGET).o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-.PHONY: clean clean-$(TARGET) clean-botloader
+# all objects (.o files)
+$(OBJECTS): $(HEADERS)
 
-clean: clean-$(TARGET)
+# remove all compiled files
+clean:
+	$(RM) $(foreach ext,elf hex eep.hex map,$(TARGET).$(ext)) \
+		$(foreach file,$(patsubst %.o,%,$(OBJECTS)),$(foreach ext,o lst lss,$(file).$(ext)))
 
-clean-$(TARGET):
-	$(RM) $(TARGET) $(OBJECTS)
-	$(RM) *.lst usbdrv/*.lst
+# additionally remove the dependency makefile
+distclean: clean
+	$(RM) $(MAKEFILE_NAME).dep
 
-clean-bootloader:
-	$(MAKE) -C bootloader clean
+# avrdude-related targets
+install program: program-$(TARGET)
 
-.PHONY: depend
+avrdude-terminal:
+	$(AVRDUDE) $(AVRDUDE_FLAGS) -c $(PROG) -P $(DEV) -t
 
+program-%: %.hex
+	$(AVRDUDE) $(AVRDUDE_FLAGS) -c $(PROG) -P $(DEV) -U flash:w:$<
+
+program-eeprom-%: %.eep.hex
+	$(AVRDUDE) $(AVRDUDE_FLAGS) -c $(PROG) -P $(DEV) -U eeprom:w:$<
+
+# special programming targets
+%.hex: %.elf
+	$(OBJCOPY) -O ihex -R .eeprom $< $@
+	@echo "========================================"
+	@echo "$@ compiled for: $(MCU)"
+	@echo -n "size for $< is "
+	@$(SIZE) -A $@ | grep '\.sec1' | tr -s ' ' | cut -d" " -f2
+	@echo "========================================"
+
+%.eep.hex: %.elf
+	$(OBJCOPY) --set-section-flags=.eeprom="alloc,load" --change-section-lma .eeprom=0 -O ihex -j .eeprom $< $@
+
+%.lss: %.elf
+	$(OBJDUMP) -h -S $< > $@
+
+# automatic dependency detection
 depend:
-	$(CC) $(CFLAGS) -M $(CDEFS) $(CINCS) $(SRC) $(ASRC) >> $(MAKEFILE).dep
+	$(CC) $(CFLAGS) -MM $(CDEFS) $(CINCS) $(SRC) $(ASRC) > $(MAKEFILE_LIST).dep
 
 -include $(MAKEFILE).dep
