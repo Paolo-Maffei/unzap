@@ -163,6 +163,6 @@ program-eeprom-%: %.eep.hex
 
 # automatic dependency detection
 depend:
-	$(CC) $(CFLAGS) -MM $(CDEFS) $(CINCS) $(SRC) $(ASRC) > $(MAKEFILE_LIST).dep
+	$(CC) $(CFLAGS) -MM $(CDEFS) $(CINCS) $(SRC) $(ASRC) > $(MAKEFILE_NAME).dep
 
--include $(MAKEFILE).dep
+-include $(MAKEFILE_NAME).dep
