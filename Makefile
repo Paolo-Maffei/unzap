@@ -15,7 +15,7 @@ TARGET = unzap
 
 # c sourcecode files
 # eg. 'test.c foo.c foobar/baz.c'
-SRC = $(shell echo *.c) usbdrv/usbdrv.c
+SRC = $(wildcard *.c) usbdrv/usbdrv.c
 
 # asm sourcecode files
 # eg. 'interrupts.S foobar/another.S'
@@ -59,20 +59,25 @@ AS = avr-as
 SIZE = avr-size
 CP = cp
 RM = rm -f
+RMDIR = rm -rf
+MKDIR = mkdir
 AVRDUDE = avrdude
 
+# flags for automatic dependency handling
+DEPFLAGS = -MD -MP -MF .dep/$(@F).d
+
 # flags for the compiler (for .c files)
-CFLAGS += -g -Os -mmcu=$(MCU) -DF_CPU=$(F_CPU) -std=gnu99 -fshort-enums
+CFLAGS += -g -Os -mmcu=$(MCU) -DF_CPU=$(F_CPU) -std=gnu99 -fshort-enums $(DEPFLAGS)
 CFLAGS += $(addprefix -I,$(INCLUDES))
 # flags for the compiler (for .S files)
-ASFLAGS += -g -mmcu=$(MCU) -DF_CPU=$(F_CPU) -x assembler-with-cpp
+ASFLAGS += -g -mmcu=$(MCU) -DF_CPU=$(F_CPU) -x assembler-with-cpp $(DEPFLAGS)
 ASFLAGS += $(addprefix -I,$(INCLUDES))
 # flags for the linker
 LDFLAGS += -mmcu=$(MCU)
 
 # fill in object files
-OBJECTS += $(patsubst %.c,%.o,$(SRC))
-OBJECTS += $(patsubst %.S,%.o,$(ASRC))
+OBJECTS += $(SRC:.c=.o)
+OBJECTS += $(ASRC:.S=.o)
 
 # include config file
 -include $(CURDIR)/config.mk
@@ -107,14 +112,11 @@ endif
 
 AVRDUDE_FLAGS += -p $(AVRDUDE_MCU)
 
-# configuration for automatic dependency detection
-MAKEFILE_NAME = $(realpath $(firstword $(MAKEFILE_LIST)))
-
 ####################################################
 # make targets
 ####################################################
 
-.PHONY: all clean distclean avrdude-terminal depend
+.PHONY: all clean distclean avrdude-terminal
 
 # main rule
 all: $(TARGET).hex
@@ -132,7 +134,7 @@ clean:
 
 # additionally remove the dependency makefile
 distclean: clean
-	$(RM) $(MAKEFILE_NAME).dep
+	$(RMDIR) .dep
 
 # avrdude-related targets
 install program: program-$(TARGET)
@@ -161,8 +163,4 @@ program-eeprom-%: %.eep.hex
 %.lss: %.elf
 	$(OBJDUMP) -h -S $< > $@
 
-# automatic dependency detection
-depend:
-	$(CC) $(CFLAGS) -MM $(CDEFS) $(CINCS) $(SRC) $(ASRC) > $(MAKEFILE_NAME).dep
-
--include $(MAKEFILE_NAME).dep
+-include $(shell $(MKDIR) .dep 2>/dev/null) $(wildcard .dep/*)
