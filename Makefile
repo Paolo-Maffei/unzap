@@ -119,7 +119,7 @@ MAKEFILE_NAME = $(realpath $(firstword $(MAKEFILE_LIST)))
 # main rule
 all: $(TARGET).hex
 
-$(TARGET).elf: $(OBJECTS) $(TARGET).o
+$(TARGET).elf: $(OBJECTS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 # all objects (.o files)
