@@ -1,0 +1,6 @@
+/config.mk
+/.dep
+*.o
+*.lst
+*.elf
+/*.hex
