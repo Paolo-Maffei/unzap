@@ -30,10 +30,15 @@
 #include "pt/pt.h"
 #include "debug.h"
 
-/* use GPIOR0 as a flag register */
-#define ir_flags GPIOR0
-#define IR_FLAG_RUNNING 0
+typedef union {
+    uint8_t raw;
+    struct {
+        uint8_t recording:1;
+    };
+} ir_flags_t;
 
+/* use GPIOR0 as the flag register */
+#define ir_flags ((volatile ir_flags_t *)(&GPIOR0))
 
 #define IR_TIMESLOTS 250
 
@@ -46,12 +51,19 @@ void ir_init(void)
     /* configure pin-change interrupt */
     PCMSK2 = _BV(PCINT19);
 
+    /* configure ir output pin */
+    DDRD |= _BV(PD5);
+    PORTD &= ~_BV(PD5);
+
+    /* init ir flags */
+    ir_flags->raw = 0;
+
     PT_INIT(&ir_thread);
 }
 
 ISR(PCINT2_vect, ISR_NOBLOCK)
 {
-    if (ir_flags & _BV(IR_FLAG_RUNNING)) {
+    if (ir_flags->recording) {
         if (timing_top < IR_TIMESLOTS) {
             /* save this measure and reset timer */
             uint16_t time = TCNT1;
@@ -63,13 +75,14 @@ ISR(PCINT2_vect, ISR_NOBLOCK)
     } else {
         /* reset timer, set running flag, toggle led */
         TCNT1 = 0;
-        ir_flags |= _BV(IR_FLAG_RUNNING);
+        ir_flags->recording = 1;
         LED1_TOGGLE();
     }
 
     /* reset overflow flag */
     TIFR1 = _BV(TOV1);
 }
+
 
 static PT_THREAD(ir_record_thread(struct pt *thread))
 {
@@ -81,7 +94,7 @@ static PT_THREAD(ir_record_thread(struct pt *thread))
 
         /* reset timing */
         timing_top = 0;
-        ir_flags &= ~_BV(IR_FLAG_RUNNING);
+        ir_flags->recording = 0;
 
         /* reset and init timer1, prescaler 256 */
         TCNT1 = 0;
@@ -94,7 +107,7 @@ static PT_THREAD(ir_record_thread(struct pt *thread))
         PCICR |= _BV(PCIE2);
 
         /* wait complete recording */
-        PT_WAIT_UNTIL(thread, ir_flags & _BV(IR_FLAG_RUNNING));
+        PT_WAIT_UNTIL(thread, ir_flags->recording);
         PT_WAIT_UNTIL(thread, TIFR1 & _BV(TOV1));
 
         /* disable timer */
