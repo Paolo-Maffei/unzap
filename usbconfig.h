@@ -152,17 +152,21 @@ the newest features and options.
 
 /* -------------------------- Device Description --------------------------- */
 
-#define  USB_CFG_VENDOR_ID  0xc0, 0x16  /* 5824 in dec, stands for VOTI */
+#define  USB_CFG_VENDOR_ID       0xc0, 0x16
 /* USB vendor ID for the device, low byte first. If you have registered your
- * own Vendor ID, define it here. Otherwise you use obdev's free shared
- * VID/PID pair. Be sure to read USBID-License.txt for rules!
+ * own Vendor ID, define it here. Otherwise you use one of obdev's free shared
+ * VID/PID pairs. Be sure to read USBID-License.txt for rules!
+ * + This template uses obdev's shared VID/PID pair: 0x16c0/0x5dc.
+ * + Use this VID/PID pair ONLY if you understand the implications!
  */
-#define USB_CFG_DEVICE_ID   0x2e, 0x28  /* 10286 in dec, assigned to lochraster.org by obdev */
+#define  USB_CFG_DEVICE_ID       0xdc, 0x05
 /* This is the ID of the product, low byte first. It is interpreted in the
  * scope of the vendor ID. If you have registered your own VID with usb.org
  * or if you have licensed a PID from somebody else, define it here. Otherwise
  * you use obdev's free shared VID/PID pair. Be sure to read the rules in
  * USBID-License.txt!
+ * + This template uses obdev's shared VID/PID pair: 0x16c0/0x5dc.
+ * + Use this VID/PID pair ONLY if you understand the implications!
  */
 #define USB_CFG_DEVICE_VERSION  0x00, 0x01
 /* Version number of the device: Minor number first, then major number.
